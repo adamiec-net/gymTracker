@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
-import { exportData, importData, resetAllData } from '../services/storage';
-import type { BeforeInstallPromptEvent } from '../types';
+import { exportData, importData, resetAllData, getSettings, saveSettings } from '../services/storage';
+import type { BeforeInstallPromptEvent, AppSettings } from '../types';
 
 export function Settings() {
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(
@@ -8,6 +8,14 @@ export function Settings() {
   );
   const [importError, setImportError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [settings, setSettings] = useState<AppSettings>(() => getSettings());
+
+  const handleTimerDurationChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const duration = parseInt(e.target.value, 10) || 90;
+    const updatedSettings = { ...settings, defaultTimerDuration: duration };
+    setSettings(updatedSettings);
+    saveSettings(updatedSettings);
+  };
 
   useEffect(() => {
     const handleInstallable = (e: Event) => {
@@ -120,6 +128,35 @@ export function Settings() {
           </button>
         </div>
       )}
+
+      {/* Workout Settings */}
+      <div className="card flex-column gap-12">
+        <h3>Ustawienia Treningu</h3>
+        <div className="form-group flex-column gap-4">
+          <label className="form-label" style={{ fontSize: '13px' }}>
+            Domyślny czas odpoczynku:
+          </label>
+          <select
+            className="input-text"
+            value={settings.defaultTimerDuration}
+            onChange={handleTimerDurationChange}
+            style={{ 
+              appearance: 'none', 
+              backgroundImage: 'url("data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'24\' height=\'24\' viewBox=\'0 0 24 24\' fill=\'none\' stroke=\'%23ffffff\' stroke-width=\'2\' stroke-linecap=\'round\' stroke-linejoin=\'round\'><polyline points=\'6 9 12 15 18 9\'></polyline></svg>")', 
+              backgroundRepeat: 'no-repeat', 
+              backgroundPosition: 'right 12px center', 
+              backgroundSize: '16px' 
+            }}
+          >
+            <option value={30} style={{ backgroundColor: 'var(--bg-surface)' }}>30 sekund</option>
+            <option value={45} style={{ backgroundColor: 'var(--bg-surface)' }}>45 sekund</option>
+            <option value={60} style={{ backgroundColor: 'var(--bg-surface)' }}>1 minuta (60s)</option>
+            <option value={90} style={{ backgroundColor: 'var(--bg-surface)' }}>1.5 minuty (90s)</option>
+            <option value={120} style={{ backgroundColor: 'var(--bg-surface)' }}>2 minuty (120s)</option>
+            <option value={180} style={{ backgroundColor: 'var(--bg-surface)' }}>3 minuty (180s)</option>
+          </select>
+        </div>
+      </div>
 
       {/* Backup and Restore */}
       <div className="card flex-column gap-12">

@@ -62,13 +62,18 @@ export function RestTimer({ duration = 90, onClose }: RestTimerProps) {
     setIsActive((prev) => !prev);
   };
 
-  const handleAdd30s = () => {
+  const handleAdjustTime = (amount: number) => {
     setSecondsRemaining((prev) => {
-      const newSecs = prev + 30;
-      setTotalSeconds((t) => Math.max(t, newSecs));
+      const newSecs = Math.max(0, prev + amount);
+      setTotalSeconds((t) => {
+        if (amount > 0) {
+          return Math.max(t, newSecs);
+        }
+        return t;
+      });
       return newSecs;
     });
-    if (secondsRemaining === 0) {
+    if (amount > 0 && secondsRemaining === 0) {
       setIsActive(true);
     }
   };
@@ -137,10 +142,20 @@ export function RestTimer({ duration = 90, onClose }: RestTimerProps) {
             <button 
               type="button" 
               className="btn btn-secondary" 
-              onClick={handleAdd30s}
+              onClick={() => handleAdjustTime(-15)}
+              style={{ flex: 1 }}
+              disabled={secondsRemaining <= 0}
+            >
+              -15s
+            </button>
+
+            <button 
+              type="button" 
+              className="btn btn-secondary" 
+              onClick={() => handleAdjustTime(15)}
               style={{ flex: 1 }}
             >
-              +30s
+              +15s
             </button>
 
             <button 

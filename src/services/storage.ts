@@ -1,9 +1,10 @@
-import type { Exercise, WorkoutTemplate, LoggedWorkout, BackupData } from '../types';
+import type { Exercise, WorkoutTemplate, LoggedWorkout, BackupData, AppSettings } from '../types';
 
 const STORAGE_KEYS = {
   EXERCISES: 'gym_tracker_exercises',
   TEMPLATES: 'gym_tracker_templates',
   HISTORY: 'gym_tracker_history',
+  SETTINGS: 'gym_tracker_settings',
 };
 
 const DEFAULT_EXERCISES: Exercise[] = [
@@ -54,6 +55,33 @@ export const deleteExercise = (id: string): Exercise[] => {
   const filtered = exercises.filter((e) => e.id !== id);
   localStorage.setItem(STORAGE_KEYS.EXERCISES, JSON.stringify(filtered));
   return filtered;
+};
+
+const DEFAULT_SETTINGS: AppSettings = {
+  defaultTimerDuration: 90,
+};
+
+/**
+ * Fetch settings from localStorage. Returns default settings if not configured.
+ */
+export const getSettings = (): AppSettings => {
+  const stored = localStorage.getItem(STORAGE_KEYS.SETTINGS);
+  if (!stored) {
+    return DEFAULT_SETTINGS;
+  }
+  try {
+    return { ...DEFAULT_SETTINGS, ...JSON.parse(stored) };
+  } catch (e) {
+    console.error('Error parsing settings, returning defaults', e);
+    return DEFAULT_SETTINGS;
+  }
+};
+
+/**
+ * Save settings to localStorage.
+ */
+export const saveSettings = (settings: AppSettings): void => {
+  localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(settings));
 };
 
 /**
@@ -222,6 +250,7 @@ export const resetAllData = (): void => {
   localStorage.removeItem(STORAGE_KEYS.EXERCISES);
   localStorage.removeItem(STORAGE_KEYS.TEMPLATES);
   localStorage.removeItem(STORAGE_KEYS.HISTORY);
+  localStorage.removeItem(STORAGE_KEYS.SETTINGS);
   // Re-preload defaults
   getExercises();
 };

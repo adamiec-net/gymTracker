@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react';
-import { getExercises, saveExercise } from '../services/storage';
+import { getExercises, saveExercise, deleteExercise, getTemplates } from '../services/storage';
 import type { Exercise } from '../types';
 
 const PRESETS = {
@@ -12,8 +12,9 @@ export function ExerciseLibrary() {
   const [search, setSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('Wszystkie');
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingExercise, setEditingExercise] = useState<Exercise | null>(null);
 
-  // Form state for new exercise
+  // Form state for new/edit exercise
   const [newName, setNewName] = useState('');
   const [newCategory, setNewCategory] = useState('Klatka');
   const [newNotes, setNewNotes] = useState('');
@@ -26,22 +27,61 @@ export function ExerciseLibrary() {
       return;
     }
 
-    const newEx: Exercise = {
-      id: 'custom-' + Date.now(),
+    const updatedEx: Exercise = {
+      id: editingExercise ? editingExercise.id : 'custom-' + Date.now(),
       name: newName.trim(),
       category: newCategory,
       notes: newNotes.trim() ? newNotes.trim() : undefined,
     };
 
-    const updated = saveExercise(newEx);
+    const updated = saveExercise(updatedEx);
     setExercises(updated);
     
-    // Reset form
+    // Reset form & close modal
+    handleCloseModal();
+  };
+
+  const handleEditClick = (ex: Exercise) => {
+    setEditingExercise(ex);
+    setNewName(ex.name);
+    setNewCategory(ex.category);
+    setNewNotes(ex.notes || '');
+    setIsModalOpen(true);
+  };
+
+  const handleCloseModal = () => {
+    setIsModalOpen(false);
+    setEditingExercise(null);
     setNewName('');
     setNewCategory('Klatka');
     setNewNotes('');
     setError('');
-    setIsModalOpen(false);
+  };
+
+  const handleDeleteClick = () => {
+    if (!editingExercise) return;
+
+    // Check if the exercise is used in any template
+    const templates = getTemplates();
+    const isUsed = templates.some((t) =>
+      t.exercises.some((e) => e.exerciseId === editingExercise.id)
+    );
+
+    if (isUsed) {
+      const confirmed = window.confirm(
+        `Ćwiczenie "${editingExercise.name}" jest aktualnie używane w szablonach treningowych. Czy na pewno chcesz je usunąć z bazy?`
+      );
+      if (!confirmed) return;
+    } else {
+      const confirmed = window.confirm(
+        `Czy na pewno chcesz usunąć ćwiczenie "${editingExercise.name}"?`
+      );
+      if (!confirmed) return;
+    }
+
+    const updated = deleteExercise(editingExercise.id);
+    setExercises(updated);
+    handleCloseModal();
   };
 
   const filteredExercises = exercises.filter((ex) => {
@@ -69,7 +109,13 @@ export function ExerciseLibrary() {
     <div className="flex-column gap-12">
       <div className="flex-row justify-between align-center">
         <h2>Atlas ćwiczeń</h2>
-        <button className="btn btn-primary btn-sm" onClick={() => setIsModalOpen(true)}>
+        <button 
+          className="btn btn-primary btn-sm" 
+          onClick={() => {
+            handleCloseModal();
+            setIsModalOpen(true);
+          }}
+        >
           + Dodaj ćwiczenie
         </button>
       </div>
@@ -108,7 +154,12 @@ export function ExerciseLibrary() {
           </div>
         ) : (
           filteredExercises.map((ex) => (
-            <div key={ex.id} className="card">
+            <div 
+              key={ex.id} 
+              className="card" 
+              onClick={() => handleEditClick(ex)}
+              style={{ cursor: 'pointer' }}
+            >
               <div className="card-header">
                 <h3 style={{ fontSize: '16px', fontWeight: '600' }}>{ex.name}</h3>
                 <span className="category-badge">
@@ -130,13 +181,10 @@ export function ExerciseLibrary() {
         <div className="modal-backdrop">
           <div className="modal-content card">
             <div className="card-header">
-              <h3>Nowe ćwiczenie</h3>
+              <h3>{editingExercise ? 'Edytuj ćwiczenie' : 'Nowe ćwiczenie'}</h3>
               <button 
                 className="btn-close" 
-                onClick={() => {
-                  setIsModalOpen(false);
-                  setError('');
-                }}
+                onClick={handleCloseModal}
                 aria-label="Zamknij"
               >
                 &times;
@@ -166,7 +214,10 @@ export function ExerciseLibrary() {
                   onChange={(e) => setNewCategory(e.target.value)}
                   style={{ appearance: 'none', backgroundImage: 'url("data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'24\' height=\'24\' viewBox=\'0 0 24 24\' fill=\'none\' stroke=\'%23ffffff\' stroke-width=\'2\' stroke-linecap=\'round\' stroke-linejoin=\'round\'><polyline points=\'6 9 12 15 18 9\'></polyline></svg>")', backgroundRepeat: 'no-repeat', backgroundPosition: 'right 12px center', backgroundSize: '16px' }}
                 >
-                  {PRESETS.ADD_CATEGORIES.map((cat) => (
+                  {(PRESETS.ADD_CATEGORIES.includes(newCategory)
+                    ? PRESETS.ADD_CATEGORIES
+                    : [newCategory, ...PRESETS.ADD_CATEGORIES]
+                  ).map((cat) => (
                     <option key={cat} value={cat} style={{ backgroundColor: 'var(--bg-surface)' }}>
                       {cat}
                     </option>
@@ -186,14 +237,21 @@ export function ExerciseLibrary() {
                 />
               </div>
 
-              <div className="flex-row justify-between" style={{ marginTop: '8px' }}>
+              <div className="flex-row gap-8" style={{ marginTop: '8px' }}>
+                {editingExercise && (
+                  <button 
+                    type="button" 
+                    className="btn btn-danger" 
+                    onClick={handleDeleteClick}
+                    style={{ flex: 1 }}
+                  >
+                    Usuń
+                  </button>
+                )}
                 <button 
                   type="button" 
                   className="btn btn-secondary" 
-                  onClick={() => {
-                    setIsModalOpen(false);
-                    setError('');
-                  }}
+                  onClick={handleCloseModal}
                   style={{ flex: 1 }}
                 >
                   Anuluj

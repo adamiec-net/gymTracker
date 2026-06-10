@@ -53,3 +53,7 @@ declare global {
   }
 }
 
+export interface AppSettings {
+  defaultTimerDuration: number; // in seconds
+}
+

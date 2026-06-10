@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import type { WorkoutTemplate, LoggedWorkout, WorkoutExercise, WorkoutSet, Exercise } from '../types';
-import { getExercises, saveWorkout } from '../services/storage';
+import { getExercises, saveWorkout, getSettings } from '../services/storage';
 import { RestTimer } from './RestTimer';
 
 interface WorkoutActiveProps {
@@ -21,7 +21,7 @@ export function WorkoutActive({ template, onFinish, onCancel }: WorkoutActivePro
   
   // Rest Timer state
   const [timerActive, setTimerActive] = useState(false);
-  const [timerDuration, setTimerDuration] = useState(90);
+  const [timerDuration, setTimerDuration] = useState(() => getSettings().defaultTimerDuration);
 
   // Overlay state for adding exercise on-the-fly
   const [showAddExerciseOverlay, setShowAddExerciseOverlay] = useState(false);
@@ -54,33 +54,32 @@ export function WorkoutActive({ template, onFinish, onCancel }: WorkoutActivePro
     field: 'reps' | 'weight',
     value: number
   ) => {
-    setExercises((prev) => {
-      const updated = [...prev];
-      const sets = [...updated[exerciseIndex].sets];
-      sets[setIndex] = {
-        ...sets[setIndex],
-        [field]: value,
-      };
-      updated[exerciseIndex].sets = sets;
-      return updated;
-    });
+    setExercises((prev) =>
+      prev.map((ex, idx) => {
+        if (idx !== exerciseIndex) return ex;
+        const updatedSets = ex.sets.map((set, sIdx) => {
+          if (sIdx !== setIndex) return set;
+          return { ...set, [field]: value };
+        });
+        return { ...ex, sets: updatedSets };
+      })
+    );
   };
 
   const handleSetCompletedToggle = (exerciseIndex: number, setIndex: number) => {
     setExercises((prev) => {
-      const updated = [...prev];
-      const sets = [...updated[exerciseIndex].sets];
-      const currentCompleted = sets[setIndex].completed;
-      const nextCompleted = !currentCompleted;
-
-      sets[setIndex] = {
-        ...sets[setIndex],
-        completed: nextCompleted,
-      };
-      updated[exerciseIndex].sets = sets;
+      const updated = prev.map((ex, idx) => {
+        if (idx !== exerciseIndex) return ex;
+        const updatedSets = ex.sets.map((set, sIdx) => {
+          if (sIdx !== setIndex) return set;
+          return { ...set, completed: !set.completed };
+        });
+        return { ...ex, sets: updatedSets };
+      });
 
       // Automatically launch Rest Timer when set is completed (false -> true)
-      if (!currentCompleted && nextCompleted) {
+      const currentCompleted = prev[exerciseIndex].sets[setIndex].completed;
+      if (!currentCompleted) {
         setTimerActive(true);
       }
 
@@ -89,30 +88,25 @@ export function WorkoutActive({ template, onFinish, onCancel }: WorkoutActivePro
   };
 
   const handleAddSet = (exerciseIndex: number) => {
-    setExercises((prev) => {
-      const updated = [...prev];
-      const sets = updated[exerciseIndex].sets;
-      const lastSet = sets[sets.length - 1];
-
-      // Copy values of previous set if available, otherwise default values
-      const newSet: WorkoutSet = lastSet
-        ? { reps: lastSet.reps, weight: lastSet.weight, completed: false }
-        : { reps: 10, weight: 0, completed: false };
-
-      updated[exerciseIndex].sets = [...sets, newSet];
-      return updated;
-    });
+    setExercises((prev) =>
+      prev.map((ex, idx) => {
+        if (idx !== exerciseIndex) return ex;
+        const lastSet = ex.sets[ex.sets.length - 1];
+        const newSet: WorkoutSet = lastSet
+          ? { reps: lastSet.reps, weight: lastSet.weight, completed: false }
+          : { reps: 10, weight: 0, completed: false };
+        return { ...ex, sets: [...ex.sets, newSet] };
+      })
+    );
   };
 
   const handleRemoveLastSet = (exerciseIndex: number) => {
-    setExercises((prev) => {
-      const updated = [...prev];
-      const sets = updated[exerciseIndex].sets;
-      if (sets.length > 0) {
-        updated[exerciseIndex].sets = sets.slice(0, -1);
-      }
-      return updated;
-    });
+    setExercises((prev) =>
+      prev.map((ex, idx) => {
+        if (idx !== exerciseIndex) return ex;
+        return { ...ex, sets: ex.sets.slice(0, -1) };
+      })
+    );
   };
 
   const handleRemoveExercise = (exerciseIndex: number) => {
