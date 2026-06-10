@@ -20,7 +20,7 @@
   - **Cel**: Stworzyć zakładkę "Waga Ciała" zawierającą wykres wagi w czasie, podsumowanie zmian (7 dni, 30 dni, min, max), szybkie dodawanie wagi oraz lista wpisów z możliwością edycji i usuwania.
   - **Warunek ukończenia**: Wykres wagi ciała rysuje się prawidłowo, dodawanie i usuwanie wpisów wagi odświeża wykres i listę w czasie rzeczywistym.
 
-- `[ ]` **Zadanie 6: Wykres korelacji wagi z wynikami (`WorkoutStats.tsx` - Zakładka 3)**
+- [x] **Zadanie 6: Wykres korelacji wagi z wynikami (`WorkoutStats.tsx` - Zakładka 3)**
   - **Cel**: Stworzyć zakładkę "Korelacja" z dwuosiowym wykresem SVG nakładającym zmiany wagi ciała na wyniki w wybranym ćwiczeniu kalistenicznym oraz dodać opis motywacyjny.
   - **Warunek ukończenia**: Wykres poprawnie wyświetla dwie linie (waga vs powtórzenia/ciężar dodatkowy) dla wybranego ćwiczenia kalistenicznego.
 

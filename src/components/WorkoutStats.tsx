@@ -16,6 +16,26 @@ interface ChartPoint {
   weightY: number;
 }
 
+const getWorkoutBodyWeight = (workout: LoggedWorkout, weightLogs: WeightLog[], settingsUserWeight?: number): number => {
+  if (workout.bodyWeight !== undefined && workout.bodyWeight !== null && workout.bodyWeight > 0) {
+    return workout.bodyWeight;
+  }
+  if (weightLogs.length > 0) {
+    const workoutTime = new Date(workout.startTime).getTime();
+    let closestLog = weightLogs[0];
+    let minDiff = Math.abs(new Date(closestLog.date).getTime() - workoutTime);
+    for (let i = 1; i < weightLogs.length; i++) {
+      const diff = Math.abs(new Date(weightLogs[i].date).getTime() - workoutTime);
+      if (diff < minDiff) {
+        minDiff = diff;
+        closestLog = weightLogs[i];
+      }
+    }
+    return closestLog.weight;
+  }
+  return settingsUserWeight || 80;
+};
+
 export function WorkoutStats() {
   const [activeTab, setActiveTab] = useState<'exercises' | 'weight' | 'correlation'>('exercises');
   const [exercises] = useState<Exercise[]>(() => getExercises());
@@ -31,6 +51,21 @@ export function WorkoutStats() {
     return defaultEx?.isBodyweight ? 'maxReps' : '1rm';
   });
   const [activePointIdx, setActivePointIdx] = useState<number | null>(null);
+
+  const calisthenicExercises = exercises.filter((e) => e.isBodyweight);
+  const [selectedCorrelationExerciseId, setSelectedCorrelationExerciseId] = useState<string>(() => {
+    const calis = getExercises().filter((e) => e.isBodyweight);
+    return calis.length > 0 ? calis[0].id : '';
+  });
+  const [correlationMetric, setCorrelationMetric] = useState<'maxReps' | 'sumReps' | 'maxExtraWeight' | 'volumeExtra'>('maxReps');
+  const [activeCorrelationPointIdx, setActiveCorrelationPointIdx] = useState<number | null>(null);
+
+  // Sync selected correlation exercise if it's empty but exercises are available
+  useEffect(() => {
+    if (!selectedCorrelationExerciseId && calisthenicExercises.length > 0) {
+      setSelectedCorrelationExerciseId(calisthenicExercises[0].id);
+    }
+  }, [calisthenicExercises, selectedCorrelationExerciseId]);
 
   const [weightLogs, setWeightLogs] = useState<WeightLog[]>(() => getWeightHistory());
   const [activeWeightPointIdx, setActiveWeightPointIdx] = useState<number | null>(null);
@@ -245,6 +280,183 @@ export function WorkoutStats() {
   const totalSessions = exerciseSessions.length;
   const recordWeight = exerciseSessions.reduce((max, s) => Math.max(max, s.maxWeight), 0);
   const bestEstimated1RM = exerciseSessions.reduce((max, s) => Math.max(max, s.estimated1RM), 0);
+
+  // Correlation calculations
+  const correlationSessions = history
+    .filter((workout) =>
+      workout.exercises.some((ex) => ex.exerciseId === selectedCorrelationExerciseId)
+    )
+    .map((workout) => {
+      const workoutEx = workout.exercises.find((ex) => ex.exerciseId === selectedCorrelationExerciseId)!;
+      const completedSets = workoutEx.sets.filter((s) => s.completed);
+      const targetSets = completedSets.length > 0 ? completedSets : workoutEx.sets;
+
+      const maxReps = targetSets.reduce((max, s) => Math.max(max, s.reps), 0);
+      const sumReps = targetSets.reduce((sum, s) => sum + s.reps, 0);
+      const maxExtraWeight = targetSets.reduce((max, s) => Math.max(max, s.weight), 0);
+      const volumeExtra = targetSets.reduce((sum, s) => sum + s.weight * s.reps, 0);
+
+      const bw = getWorkoutBodyWeight(workout, weightLogs, settings.userWeight);
+
+      let val = 0;
+      if (correlationMetric === 'maxReps') val = maxReps;
+      else if (correlationMetric === 'sumReps') val = sumReps;
+      else if (correlationMetric === 'maxExtraWeight') val = maxExtraWeight;
+      else if (correlationMetric === 'volumeExtra') val = volumeExtra;
+
+      return {
+        id: workout.id,
+        date: new Date(workout.startTime),
+        dateStr: new Date(workout.startTime).toLocaleDateString('pl-PL', { day: '2-digit', month: '2-digit' }),
+        fullDateStr: new Date(workout.startTime).toLocaleDateString('pl-PL', {
+          weekday: 'long',
+          day: '2-digit',
+          month: '2-digit',
+          year: 'numeric',
+        }),
+        val,
+        bodyWeight: bw,
+      };
+    });
+
+  // Sort chronological ascending (oldest first)
+  correlationSessions.sort((a, b) => a.date.getTime() - b.date.getTime());
+
+  // Chart setup for correlation
+  const corrWidth = 500;
+  const corrHeight = 260;
+  const corrPadding = { top: 30, right: 50, bottom: 50, left: 50 };
+  const corrChartWidth = corrWidth - corrPadding.left - corrPadding.right;
+  const corrChartHeight = corrHeight - corrPadding.top - corrPadding.bottom;
+
+  let correlationPoints: {
+    x: number;
+    y: number;
+    weightY: number;
+    val: number;
+    bodyWeight: number;
+    dateStr: string;
+    fullDateStr: string;
+  }[] = [];
+
+  let corrLineD = '';
+  let corrWeightLineD = '';
+  let perfGridLines: { y: number; val: string }[] = [];
+  let weightAxisValues: { y: number; val: string }[] = [];
+  let minPerf = 0;
+  let maxPerf = 0;
+  let minWeight = 0;
+  let maxWeight = 0;
+
+  if (correlationSessions.length > 0) {
+    minPerf = Math.min(...correlationSessions.map((s) => s.val));
+    maxPerf = Math.max(...correlationSessions.map((s) => s.val));
+    minWeight = Math.min(...correlationSessions.map((s) => s.bodyWeight));
+    maxWeight = Math.max(...correlationSessions.map((s) => s.bodyWeight));
+
+    // Padding for Performance axis
+    if (minPerf === maxPerf) {
+      minPerf = Math.max(0, minPerf - 5);
+      maxPerf = maxPerf + 5;
+    } else {
+      const range = maxPerf - minPerf;
+      minPerf = Math.max(0, minPerf - range * 0.15);
+      maxPerf = maxPerf + range * 0.15;
+    }
+    minPerf = Math.floor(minPerf);
+    maxPerf = Math.ceil(maxPerf);
+
+    // Padding for Weight axis
+    if (minWeight === maxWeight) {
+      minWeight = Math.max(0, minWeight - 5);
+      maxWeight = maxWeight + 5;
+    } else {
+      const range = maxWeight - minWeight;
+      minWeight = Math.max(0, minWeight - range * 0.15);
+      maxWeight = maxWeight + range * 0.15;
+    }
+    minWeight = Math.floor(minWeight);
+    maxWeight = Math.ceil(maxWeight);
+
+    correlationPoints = correlationSessions.map((d, i) => {
+      const x =
+        corrPadding.left +
+        (correlationSessions.length > 1 ? (i / (correlationSessions.length - 1)) * corrChartWidth : corrChartWidth / 2);
+      const y = corrPadding.top + corrChartHeight - ((d.val - minPerf) / (maxPerf - minPerf)) * corrChartHeight;
+      const weightY = corrPadding.top + corrChartHeight - ((d.bodyWeight - minWeight) / (maxWeight - minWeight)) * corrChartHeight;
+      return {
+        x,
+        y,
+        weightY,
+        val: d.val,
+        bodyWeight: d.bodyWeight,
+        dateStr: d.dateStr,
+        fullDateStr: d.fullDateStr,
+      };
+    });
+
+    if (correlationPoints.length > 1) {
+      corrLineD = `M ${correlationPoints.map((p) => `${p.x} ${p.y}`).join(' L ')}`;
+      corrWeightLineD = `M ${correlationPoints.map((p) => `${p.x} ${p.weightY}`).join(' L ')}`;
+    }
+
+    const gridCount = 4;
+    perfGridLines = Array.from({ length: gridCount }).map((_, idx) => {
+      const val = minPerf + (idx / (gridCount - 1)) * (maxPerf - minPerf);
+      const y = corrPadding.top + corrChartHeight - (idx / (gridCount - 1)) * corrChartHeight;
+      return { y, val: val.toFixed(correlationMetric === 'maxExtraWeight' || correlationMetric === 'volumeExtra' ? 1 : 0) };
+    });
+
+    weightAxisValues = Array.from({ length: gridCount }).map((_, idx) => {
+      const val = minWeight + (idx / (gridCount - 1)) * (maxWeight - minWeight);
+      const y = corrPadding.top + corrChartHeight - (idx / (gridCount - 1)) * corrChartHeight;
+      return { y, val: val.toFixed(1) };
+    });
+  }
+
+  const displayCorrPoint =
+    activeCorrelationPointIdx !== null && activeCorrelationPointIdx < correlationPoints.length
+      ? correlationPoints[activeCorrelationPointIdx]
+      : correlationPoints.length > 0
+      ? correlationPoints[correlationPoints.length - 1]
+      : null;
+
+  const getCorrelationMetricLabel = (m: typeof correlationMetric) => {
+    switch (m) {
+      case 'maxReps': return 'Maks. powtórzenia w serii';
+      case 'sumReps': return 'Suma powtórzeń';
+      case 'maxExtraWeight': return 'Maks. dodatkowy ciężar';
+      case 'volumeExtra': return 'Objętość dodatkowa';
+      default: return '';
+    }
+  };
+
+  const getCorrelationMetricUnit = (m: typeof correlationMetric) => {
+    if (m === 'maxReps' || m === 'sumReps') return 'powt.';
+    return 'kg';
+  };
+
+  // Dynamic motivational description
+  let motivationalDescription = '';
+  if (correlationSessions.length >= 2) {
+    const earliestSession = correlationSessions[0];
+    const latestSession = correlationSessions[correlationSessions.length - 1];
+    const deltaWeight = latestSession.bodyWeight - earliestSession.bodyWeight;
+    const deltaPerf = latestSession.val - earliestSession.val;
+
+    const perfUnit = getCorrelationMetricUnit(correlationMetric);
+    const perfText = `${deltaPerf >= 0 ? '+' : ''}${deltaPerf.toFixed(deltaPerf % 1 === 0 ? 0 : 1)} ${perfUnit}`;
+
+    if (deltaWeight < 0 && deltaPerf > 0) {
+      motivationalDescription = `Twoja waga spadła o ${Math.abs(deltaWeight).toFixed(1)} kg, a wynik w ćwiczeniu wzrósł o ${perfText}. Spadek masy ciała zmniejszył opór grawitacyjny, co ułatwiło osiągnięcie lepszych rezultatów i poprawiło Twoją siłę względną. Świetna robota!`;
+    } else if (deltaWeight >= 0 && deltaPerf > 0) {
+      motivationalDescription = `Twoja waga wzrosła o ${deltaWeight.toFixed(1)} kg, a wynik poprawił się o ${perfText}. To znakomity dowód na budowanie czystej masy mięśniowej oraz rozwój siły absolutnej. Twoje ciało staje się silniejsze i bardziej wydajne!`;
+    } else if (deltaWeight < 0 && deltaPerf <= 0) {
+      motivationalDescription = `Zredukowałeś wagę o ${Math.abs(deltaWeight).toFixed(1)} kg, ale Twój wynik zmienił się o ${perfText}. Pamiętaj, że podczas redukcji chwilowy spadek siły jest normalny. Kontynuuj treningi, a siła względna wkrótce wzrośnie, gdy organizm w pełni zaadaptuje się do nowej wagi.`;
+    } else if (deltaWeight >= 0 && deltaPerf <= 0) {
+      motivationalDescription = `Twoja waga wzrosła o ${deltaWeight.toFixed(1)} kg, podczas gdy wynik zmienił się o ${perfText}. Zwiększona masa ciała oznacza większy opór grawitacyjny w ćwiczeniach kalistenicznych. Warto kontrolować tempo przybierania na wadze lub skupić się na budowaniu większej siły absolutnej, by pokonać dodatkowy opór.`;
+    }
+  }
 
   return (
     <div className="flex-column gap-16" style={{ paddingBottom: '32px' }}>
@@ -783,8 +995,365 @@ export function WorkoutStats() {
       )}
 
       {activeTab === 'correlation' && (
-        <div className="card text-center" style={{ padding: '48px 16px' }}>
-          <h3>Widok korelacji - w przygotowaniu</h3>
+        <div className="flex-column gap-16">
+          {calisthenicExercises.length === 0 ? (
+            <div className="card text-center" style={{ padding: '48px 16px' }}>
+              <svg
+                width="48"
+                height="48"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="var(--text-secondary)"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                style={{ margin: '0 auto 16px auto', opacity: 0.5 }}
+              >
+                <path d="M12 2v20" />
+                <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+              </svg>
+              <h3>Brak ćwiczeń kalistenicznych</h3>
+              <p className="text-muted" style={{ marginTop: '8px', fontSize: '14px', lineHeight: '1.5' }}>
+                Brak ćwiczeń kalistenicznych. Aby korzystać z wykresu korelacji, dodaj w Atlasie ćwiczenia oznaczone jako 'ciężar własnego ciała'.
+              </p>
+            </div>
+          ) : (
+            <>
+              {/* Exercise and Metric Selectors */}
+              <div className="card flex-column gap-12">
+                <div className="form-group">
+                  <label className="form-label" htmlFor="correlation-exercise-select">Ćwiczenie kalisteniczne</label>
+                  <select
+                    id="correlation-exercise-select"
+                    className="input-text"
+                    value={selectedCorrelationExerciseId}
+                    onChange={(e) => {
+                      setSelectedCorrelationExerciseId(e.target.value);
+                      setActiveCorrelationPointIdx(null);
+                    }}
+                    style={{
+                      appearance: 'none',
+                      backgroundImage: 'url("data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'24\' height=\'24\' viewBox=\'0 0 24 24\' fill=\'none\' stroke=\'%23ffffff\' stroke-width=\'2\' stroke-linecap=\'round\' stroke-linejoin=\'round\'><polyline points=\'6 9 12 15 18 9\'></polyline></svg>")',
+                      backgroundRepeat: 'no-repeat',
+                      backgroundPosition: 'right 12px center',
+                      backgroundSize: '16px',
+                      paddingRight: '36px',
+                    }}
+                  >
+                    {calisthenicExercises.map((ex) => (
+                      <option key={ex.id} value={ex.id} style={{ backgroundColor: 'var(--bg-surface)' }}>
+                        {ex.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                  <button
+                    type="button"
+                    className={`chip-btn ${correlationMetric === 'maxReps' ? 'active' : ''}`}
+                    onClick={() => setCorrelationMetric('maxReps')}
+                    style={{ textAlign: 'center' }}
+                  >
+                    Maks. Powtórzenia
+                  </button>
+                  <button
+                    type="button"
+                    className={`chip-btn ${correlationMetric === 'sumReps' ? 'active' : ''}`}
+                    onClick={() => setCorrelationMetric('sumReps')}
+                    style={{ textAlign: 'center' }}
+                  >
+                    Suma Powtórzeń
+                  </button>
+                  <button
+                    type="button"
+                    className={`chip-btn ${correlationMetric === 'maxExtraWeight' ? 'active' : ''}`}
+                    onClick={() => setCorrelationMetric('maxExtraWeight')}
+                    style={{ textAlign: 'center' }}
+                  >
+                    Maks. Dodatkowy Ciężar
+                  </button>
+                  <button
+                    type="button"
+                    className={`chip-btn ${correlationMetric === 'volumeExtra' ? 'active' : ''}`}
+                    onClick={() => setCorrelationMetric('volumeExtra')}
+                    style={{ textAlign: 'center' }}
+                  >
+                    Objętość Dodatkowa
+                  </button>
+                </div>
+              </div>
+
+              {/* Chart and dynamic motivational desc */}
+              {correlationSessions.length < 2 ? (
+                <div className="card text-center" style={{ padding: '48px 16px' }}>
+                  <svg
+                    width="48"
+                    height="48"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="var(--text-secondary)"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    style={{ margin: '0 auto 16px auto', opacity: 0.5 }}
+                  >
+                    <path d="M18 20V10" />
+                    <path d="M12 20V4" />
+                    <path d="M6 20v-6" />
+                  </svg>
+                  <h3>Zbyt mało danych</h3>
+                  <p className="text-muted" style={{ marginTop: '8px', fontSize: '14px', lineHeight: '1.5' }}>
+                    Zbyt mało danych. Zaloguj co najmniej 2 treningi z tym ćwiczeniem, aby zobaczyć wykres korelacji wagi z wynikami.
+                  </p>
+                </div>
+              ) : (
+                <div className="flex-column gap-16">
+                  {/* Selected data point detail header card */}
+                  {displayCorrPoint && (
+                    <div
+                      className="card flex-row justify-between align-center"
+                      style={{
+                        borderLeft: '4px solid var(--accent)',
+                        padding: '12px 16px',
+                        background: 'var(--bg-secondary)',
+                      }}
+                    >
+                      <div className="flex-column" style={{ gap: '4px' }}>
+                        <span className="text-muted" style={{ fontSize: '11px', textTransform: 'uppercase', fontWeight: 'bold' }}>
+                          Sesja z {displayCorrPoint.fullDateStr}
+                        </span>
+                        <span style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
+                          Waga ciała w tej sesji: <strong style={{ color: 'var(--text-primary)' }}>{displayCorrPoint.bodyWeight.toFixed(1)} kg</strong>
+                        </span>
+                      </div>
+                      <div className="text-center">
+                        <span className="text-muted" style={{ fontSize: '11px', textTransform: 'uppercase' }}>
+                          {getCorrelationMetricLabel(correlationMetric)}
+                        </span>
+                        <div style={{ fontSize: '20px', fontWeight: '700', color: 'var(--accent)' }}>
+                          {displayCorrPoint.val} {getCorrelationMetricUnit(correlationMetric)}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Dual Axis Chart Card */}
+                  <div className="card" style={{ padding: '16px 8px 8px 8px' }}>
+                    <div style={{ position: 'relative', width: '100%', overflow: 'hidden' }}>
+                      <svg
+                        width="100%"
+                        height="100%"
+                        viewBox={`0 0 ${corrWidth} ${corrHeight}`}
+                        style={{ overflow: 'visible', display: 'block' }}
+                      >
+                        <defs>
+                          <linearGradient id="corr-chart-gradient" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stopColor="var(--accent)" stopOpacity="0.3" />
+                            <stop offset="100%" stopColor="var(--accent)" stopOpacity="0.0" />
+                          </linearGradient>
+                        </defs>
+
+                        {/* Horizontal Gridlines */}
+                        {perfGridLines.map((line, idx) => (
+                          <g key={idx}>
+                            <line
+                              x1={corrPadding.left}
+                              y1={line.y}
+                              x2={corrWidth - corrPadding.right}
+                              y2={line.y}
+                              stroke="var(--border)"
+                              strokeWidth="1"
+                              strokeDasharray="4 4"
+                            />
+                            {/* Left Y Axis Labels */}
+                            <text
+                              x={corrPadding.left - 10}
+                              y={line.y + 4}
+                              fill="var(--text-secondary)"
+                              fontSize="11"
+                              textAnchor="end"
+                              fontWeight="500"
+                            >
+                              {line.val}
+                            </text>
+                          </g>
+                        ))}
+
+                        {/* Right Y Axis Labels (Body Weight) */}
+                        {weightAxisValues.map((line, idx) => (
+                          <text
+                            key={idx}
+                            x={corrWidth - corrPadding.right + 10}
+                            y={line.y + 4}
+                            fill="var(--text-secondary)"
+                            fontSize="11"
+                            textAnchor="start"
+                            fontWeight="500"
+                          >
+                            {line.val}
+                          </text>
+                        ))}
+
+                        {/* Axis lines */}
+                        <line
+                          x1={corrPadding.left}
+                          y1={corrPadding.top}
+                          x2={corrPadding.left}
+                          y2={corrPadding.top + corrChartHeight}
+                          stroke="var(--border)"
+                          strokeWidth="1"
+                        />
+                        <line
+                          x1={corrWidth - corrPadding.right}
+                          y1={corrPadding.top}
+                          x2={corrWidth - corrPadding.right}
+                          y2={corrPadding.top + corrChartHeight}
+                          stroke="var(--border)"
+                          strokeWidth="1"
+                        />
+                        <line
+                          x1={corrPadding.left}
+                          y1={corrPadding.top + corrChartHeight}
+                          x2={corrWidth - corrPadding.right}
+                          y2={corrPadding.top + corrChartHeight}
+                          stroke="var(--border)"
+                          strokeWidth="1"
+                        />
+
+                        {/* Area */}
+                        {correlationPoints.length > 1 && (
+                          <path
+                            d={`${corrLineD} L ${correlationPoints[correlationPoints.length - 1].x} ${corrPadding.top + corrChartHeight} L ${correlationPoints[0].x} ${corrPadding.top + corrChartHeight} Z`}
+                            fill="url(#corr-chart-gradient)"
+                          />
+                        )}
+
+                        {/* Body Weight Line (Dashed) */}
+                        {correlationPoints.length > 1 && (
+                          <path
+                            d={corrWeightLineD}
+                            fill="none"
+                            stroke="var(--text-secondary)"
+                            strokeWidth="2"
+                            strokeDasharray="4 4"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            opacity="0.6"
+                          />
+                        )}
+
+                        {/* Performance Line */}
+                        {correlationPoints.length > 1 && (
+                          <path
+                            d={corrLineD}
+                            fill="none"
+                            stroke="var(--accent)"
+                            strokeWidth="3"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                        )}
+
+                        {/* Interactive Circles */}
+                        {correlationPoints.map((p, idx) => {
+                          const isActive =
+                            activeCorrelationPointIdx === idx || (activeCorrelationPointIdx === null && idx === correlationPoints.length - 1);
+                          return (
+                            <g key={idx}>
+                              <circle
+                                cx={p.x}
+                                cy={p.y}
+                                r="14"
+                                fill="transparent"
+                                style={{ cursor: 'pointer' }}
+                                onClick={() => setActiveCorrelationPointIdx(idx)}
+                              />
+                              <circle
+                                cx={p.x}
+                                cy={p.y}
+                                r={isActive ? '6' : '4'}
+                                fill={isActive ? 'var(--accent)' : 'var(--bg-primary)'}
+                                stroke="var(--accent)"
+                                strokeWidth="2"
+                                style={{ transition: 'all 0.1s ease', cursor: 'pointer' }}
+                                onClick={() => setActiveCorrelationPointIdx(idx)}
+                              />
+                              {(() => {
+                                const total = correlationPoints.length;
+                                const shouldShow =
+                                  total <= 6 ||
+                                  idx === 0 ||
+                                  idx === total - 1 ||
+                                  (total > 6 && total <= 12 && idx % 2 === 0) ||
+                                  (total > 12 && idx % Math.floor(total / 4) === 0);
+
+                                if (!shouldShow) return null;
+
+                                return (
+                                  <text
+                                    x={p.x}
+                                    y={corrPadding.top + corrChartHeight + 20}
+                                    fill={isActive ? 'var(--accent)' : 'var(--text-secondary)'}
+                                    fontSize="10"
+                                    fontWeight={isActive ? '600' : 'normal'}
+                                    textAnchor="middle"
+                                  >
+                                    {p.dateStr}
+                                  </text>
+                                );
+                              })()}
+                            </g>
+                          );
+                        })}
+                      </svg>
+                    </div>
+                    <p className="text-center text-muted" style={{ fontSize: '11px', marginTop: '12px' }}>
+                      Wskazówka: Dotknij punktu na wykresie, aby zobaczyć szczegóły.
+                    </p>
+
+                    {/* Legend */}
+                    <div className="flex-row justify-center gap-16" style={{ marginTop: '8px', fontSize: '11px', borderTop: '1px solid var(--border)', paddingTop: '8px' }}>
+                      <div className="flex-row align-center gap-4">
+                        <div style={{ width: '12px', height: '3px', background: 'var(--accent)', borderRadius: '1px' }} />
+                        <span className="text-muted">{getCorrelationMetricLabel(correlationMetric)} (lewa oś)</span>
+                      </div>
+                      <div className="flex-row align-center gap-4">
+                        <div style={{ width: '12px', height: '1.5px', borderBottom: '1.5px dashed var(--text-secondary)', opacity: 0.6 }} />
+                        <span className="text-muted">Waga ciała (prawa oś)</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Motivational description card */}
+                  {motivationalDescription && (
+                    <div className="card flex-column gap-12" style={{ padding: '16px', background: 'rgba(0, 210, 255, 0.03)', borderLeft: '4px solid var(--accent)' }}>
+                      <div className="flex-row align-center gap-8">
+                        <svg
+                          width="20"
+                          height="20"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="var(--accent)"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A5 5 0 0 0 8 8c0 1 .3 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5" />
+                          <line x1="9" y1="18" x2="15" y2="18" />
+                          <line x1="10" y1="22" x2="14" y2="22" />
+                        </svg>
+                        <h4 style={{ fontSize: '14px', fontWeight: '700', textTransform: 'uppercase', color: 'var(--accent)', letterSpacing: '0.5px' }}>Analiza trendu wagi i siły</h4>
+                      </div>
+                      <p style={{ fontSize: '13.5px', lineHeight: '1.6', color: 'var(--text-secondary)', margin: 0 }}>
+                        {motivationalDescription}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
+            </>
+          )}
         </div>
       )}
 
