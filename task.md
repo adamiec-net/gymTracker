@@ -12,7 +12,7 @@
   - **Cel**: Dodać przycisk „Edytuj” do kart historii oraz stworzyć modal `EditWorkoutModal` pozwalający na pełną modyfikację treningu (nazwa, data, waga, ćwiczenia, serie) z automatyczną synchronizacją wagi.
   - **Warunek ukończenia**: Możliwość edycji dowolnego historycznego treningu w UI, zapisanie zmian aktualizuje listę treningów i bazę wagi.
 
-- `[ ]` **Zadanie 4: Statystyki Ćwiczeń z rozróżnieniem kalisteniki (`WorkoutStats.tsx` - Zakładka 1)**
+- [x] **Zadanie 4: Statystyki Ćwiczeń z rozróżnieniem kalisteniki (`WorkoutStats.tsx` - Zakładka 1)**
   - **Cel**: Stworzyć zakładkę "Ćwiczenia". Dla ćwiczeń kalistenicznych wykluczyć wagę użytkownika z obciążeń i dodać metryki: Maks. powtórzenia, Suma powtórzeń, Maks. dodatkowy ciężar, Objętość dodatkowa. Dla pozostałych ćwiczeń wyświetlić: 1RM, Maks. ciężar, Objętość, Maks. powtórzenia.
   - **Warunek ukończenia**: Wykres SVG poprawnie reaguje na wybrane ćwiczenie kalisteniczne i standardowe oraz wybrane metryki.
 
