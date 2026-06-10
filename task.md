@@ -31,7 +31,7 @@ Poniższa lista zadań została przygotowana na podstawie [implementation_plan.m
 
 ## Krok 4: Nawigacja i Główny Układ Aplikacji
 
-- [ ] **4.1. Implementacja komponentu Navigation i Layout**
+- [x] **4.1. Implementacja komponentu Navigation i Layout**
   - **Cel:** Stworzenie dolnego/bocznego paska nawigacji do przełączania się między widokami.
   - **Warunek ukończenia:** Komponent [Navigation.tsx](file:///c:/source/gymTracker/src/components/Navigation.tsx) poprawnie zmienia stan aktywnej zakładki w głównym komponencie [App.tsx](file:///c:/source/gymTracker/src/App.tsx). Pasek nawigacji jest responsywny i czytelny na telefonie komórkowym.
 
