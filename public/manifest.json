@@ -1,0 +1,22 @@
+{
+  "short_name": "GymTracker",
+  "name": "Gym Tracker PWA",
+  "description": "A modern, minimalist PWA gym tracker for logging workouts offline.",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "type": "image/svg+xml",
+      "sizes": "any"
+    },
+    {
+      "src": "favicon.svg",
+      "type": "image/svg+xml",
+      "sizes": "any"
+    }
+  ],
+  "start_url": "/",
+  "background_color": "#121212",
+  "theme_color": "#121212",
+  "display": "standalone",
+  "orientation": "portrait"
+}

@@ -4,13 +4,13 @@ Poniższa lista zadań została przygotowana na podstawie [implementation_plan.m
 
 ## Krok 1: Konfiguracja i PWA
 
-- [ ] **1.1. Inicjalizacja projektu React + Vite + TS**
+- [x] **1.1. Inicjalizacja projektu React + Vite + TS**
   - **Cel:** Stworzenie podstawowej struktury aplikacji React z TypeScript i konfiguracją Vite.
   - **Warunek ukończenia:** Poprawne uruchomienie czystego szablonu deweloperskiego za pomocą `npm run dev`. Brak błędów kompilacji TS i lintera.
-- [ ] **1.2. Konfiguracja Manifestu PWA i ikony**
+- [x] **1.2. Konfiguracja Manifestu PWA i ikony**
   - **Cel:** Stworzenie pliku manifestu aplikacji mobilnej, aby można ją było zainstalować na Androidzie.
   - **Warunek ukończenia:** Plik [manifest.json](file:///c:/source/gymTracker/public/manifest.json) jest dostępny pod ścieżką `/manifest.json`, zawiera poprawne dane aplikacji (nazwa, kolory, ikony, standalone). Narzędzia deweloperskie Chrome (DevTools -> Application -> Manifest) poprawnie go rozpoznają.
-- [ ] **1.3. Rejestracja Service Workera**
+- [x] **1.3. Rejestracja Service Workera**
   - **Cel:** Stworzenie prostego Service Workera obsługującego cache'owanie plików statycznych w celu działania offline.
   - **Warunek ukończenia:** Plik [sw.js](file:///c:/source/gymTracker/public/sw.js) cache'uje niezbędne zasoby, a plik [registerServiceWorker.ts](file:///c:/source/gymTracker/src/registerServiceWorker.ts) rejestruje go podczas startu aplikacji. DevTools wykazuje status "Active and running" dla Service Workera.
 
