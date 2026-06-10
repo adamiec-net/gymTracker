@@ -66,13 +66,13 @@ Poniższa lista zadań została przygotowana na podstawie [implementation_plan.m
 
 ## Krok 7: Historia, Statystyki i Ustawienia
 
-- [ ] **7.1. Widok Historii Treningów (Workout History)**
+- [x] **7.1. Widok Historii Treningów (Workout History)**
   - **Cel:** Przeglądanie i usuwanie archiwalnych treningów.
   - **Warunek ukończenia:** Komponent [WorkoutHistory.tsx](file:///c:/source/gymTracker/src/components/WorkoutHistory.tsx) wyświetla listę zakończonych treningów w kolejności chronologicznej wstecz, pokazuje szczegóły wykonanych serii i pozwala na usunięcie wpisu.
-- [ ] **7.2. Statystyki i Wykresy Progresu (Workout Stats)**
+- [x] **7.2. Statystyki i Wykresy Progresu (Workout Stats)**
   - **Cel:** Wizualizacja progresu siłowego/objętościowego dla wybranego ćwiczenia.
   - **Warunek ukończenia:** Komponent [WorkoutStats.tsx](file:///c:/source/gymTracker/src/components/WorkoutStats.tsx) rysuje minimalistyczny wykres (np. za pomocą czystego SVG lub prostej biblioteki) przedstawiający maksymalny ciężar lub szacowany 1RM w czasie dla wybranego ćwiczenia z historii.
-- [ ] **7.3. Widok Ustawień (Settings) i Backup**
+- [x] **7.3. Widok Ustawień (Settings) i Backup**
   - **Cel:** Zarządzanie kopią zapasową danych oraz instalacją PWA.
   - **Warunek ukończenia:** Komponent [Settings.tsx](file:///c:/source/gymTracker/src/components/Settings.tsx) poprawnie pobiera plik JSON z całą bazą danych (Export) oraz pozwala wgrać plik JSON, nadpisując/scalając dane (Import). Dostępna jest również opcja resetu danych z potwierdzeniem `confirm`.
 
