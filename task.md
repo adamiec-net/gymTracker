@@ -24,6 +24,6 @@
   - **Cel**: Stworzyć zakładkę "Korelacja" z dwuosiowym wykresem SVG nakładającym zmiany wagi ciała na wyniki w wybranym ćwiczeniu kalistenicznym oraz dodać opis motywacyjny.
   - **Warunek ukończenia**: Wykres poprawnie wyświetla dwie linie (waga vs powtórzenia/ciężar dodatkowy) dla wybranego ćwiczenia kalistenicznego.
 
-- `[ ]` **Zadanie 7: Weryfikacja końcowa i testy**
+- [x] **Zadanie 7: Weryfikacja końcowa i testy**
   - **Cel**: Sprawdzić działanie całej aplikacji w przeglądarce pod kątem błędów konsoli, poprawności RWD, działania offline/PWA oraz spójności importu/eksportu.
   - **Warunek ukończenia**: Brak błędów w konsoli, aplikacja buduje się produkcyjnie (`npm run build`), wszystkie przepływy synchronizacji działają bez zarzutu.
