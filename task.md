@@ -25,7 +25,7 @@ Poniższa lista zadań została przygotowana na podstawie [implementation_plan.m
 
 ## Krok 3: Stylizacja i System Projektowy (Design System)
 
-- [ ] **3.1. Konfiguracja stylów CSS (Modern Minimalist Dark Theme)**
+- [x] **3.1. Konfiguracja stylów CSS (Modern Minimalist Dark Theme)**
   - **Cel:** Przygotowanie globalnego arkusza stylów CSS definiującego kolory, typografię, reset oraz zmienne CSS dla ciemnego motywu.
   - **Warunek ukończenia:** Plik [index.css](file:///c:/source/gymTracker/src/index.css) zawiera zmienne CSS (`--bg-primary`, `--bg-secondary`, `--text-primary`, `--accent-color`, itp.), minimalistyczny font (Inter/systemowy) oraz podstawowe reguły layoutu (np. pełny ekran mobilny bez przewijania poziomego).
 
