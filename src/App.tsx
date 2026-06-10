@@ -1,7 +1,11 @@
 import { useState } from 'react';
 import { Navigation } from './components/Navigation';
 import type { Tab } from './components/Navigation';
-import { getExercises, getTemplates, getHistory } from './services/storage';
+import { getExercises, getHistory } from './services/storage';
+import { WorkoutSchedule } from './components/WorkoutSchedule';
+import { WorkoutTemplates } from './components/WorkoutTemplates';
+import { ExerciseLibrary } from './components/ExerciseLibrary';
+import type { WorkoutTemplate } from './types';
 import './App.css';
 
 const TAB_TITLES: Record<Tab, string> = {
@@ -15,89 +19,67 @@ const TAB_TITLES: Record<Tab, string> = {
 
 function App() {
   const [activeTab, setActiveTab] = useState<Tab>('schedule');
+  const [activeWorkout, setActiveWorkout] = useState<WorkoutTemplate | null>(null);
   const headerTitle = TAB_TITLES[activeTab];
 
+  if (activeWorkout) {
+    return (
+      <div className="app-container">
+        <header className="app-header">
+          <h1>Aktywny trening</h1>
+          <div style={{ fontSize: '12px', fontWeight: '500', color: 'var(--text-secondary)' }}>
+            GymTracker
+          </div>
+        </header>
+        
+        <main className="app-content">
+          <div className="placeholder-screen flex-column text-center justify-center align-center" style={{ padding: '32px 16px', gap: '20px', height: '100%' }}>
+            <span className="text-success" style={{ fontSize: '14px', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '1px' }}>
+              Trening w toku
+            </span>
+            <h2 style={{ fontSize: '24px' }}>{activeWorkout.name}</h2>
+            <p className="text-muted">
+              To jest tymczasowy ekran aktywnego treningu. W kolejnym kroku zaimplementujemy pełne śledzenie serii.
+            </p>
+            <div className="card" style={{ width: '100%', padding: '16px' }}>
+              <h3 style={{ textAlign: 'left' }}>Ćwiczenia do wykonania:</h3>
+              <ul style={{ listStyle: 'none', padding: 0, marginTop: '8px', textAlign: 'left' }}>
+                {activeWorkout.exercises.map((e, idx) => (
+                  <li key={idx} style={{ padding: '6px 0', borderBottom: '1px solid var(--border)', fontSize: '14px' }} className="flex-row justify-between">
+                    <span>{getExercises().find(ex => ex.id === e.exerciseId)?.name || 'Nieznane ćwiczenie'}</span>
+                    <span className="text-muted">{e.sets.length} serii</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <button 
+              className="btn btn-success btn-full" 
+              onClick={() => setActiveWorkout(null)}
+              style={{ marginTop: '12px', padding: '14px 20px' }}
+            >
+              Zakończ trening
+            </button>
+          </div>
+        </main>
+      </div>
+    );
+  }
 
   const renderActiveView = () => {
     switch (activeTab) {
       case 'schedule':
         return (
-          <div className="placeholder-screen flex-column">
-            <h2>Harmonogram treningów</h2>
-            <p className="text-muted">Zaplanuj swoje treningi na poszczególne dni tygodnia.</p>
-            <div className="card">
-              <div className="card-header">
-                <h3>Dzisiejszy trening</h3>
-                <span className="text-success" style={{ fontSize: '12px', fontWeight: 'bold' }}>Środa</span>
-              </div>
-              <p>Brak zaplanowanego treningu na dzisiaj.</p>
-              <button className="btn btn-primary btn-full">Rozpocznij pusty trening</button>
-            </div>
-            <div className="card">
-              <h3>Nadchodzące dni</h3>
-              <div className="flex-column gap-12" style={{ marginTop: '8px' }}>
-                {['Czwartek', 'Piątek', 'Sobota', 'Niedziela', 'Poniedziałek', 'Wtorek'].map((day, idx) => (
-                  <div key={idx} className="flex-row justify-between" style={{ padding: '8px 0', borderBottom: '1px solid var(--border)' }}>
-                    <span>{day}</span>
-                    <span className="text-muted" style={{ fontSize: '13px' }}>Brak planu</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
+          <WorkoutSchedule onStartWorkout={setActiveWorkout} />
         );
-      case 'templates': {
-        const templates = getTemplates();
+      case 'templates':
         return (
-          <div className="placeholder-screen flex-column">
-            <h2>Szablony treningowe</h2>
-            <p className="text-muted">Twórz szablony i używaj ich do szybkiego rozpoczynania treningu.</p>
-            {templates.length === 0 ? (
-              <div className="card text-center" style={{ padding: '24px 16px' }}>
-                <p className="text-muted" style={{ marginBottom: '16px' }}>Brak zapisanych szablonów.</p>
-                <button className="btn btn-secondary btn-full">+ Nowy szablon</button>
-              </div>
-            ) : (
-              <div className="flex-column gap-12">
-                {templates.map((tpl) => (
-                  <div key={tpl.id} className="card">
-                    <div className="card-header">
-                      <h3>{tpl.name}</h3>
-                      <span className="text-muted">{tpl.exercises.length} ćwiczeń</span>
-                    </div>
-                    <button className="btn btn-primary btn-sm">Zacznij trening</button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+          <WorkoutTemplates onStartWorkout={setActiveWorkout} />
         );
-      }
-      case 'exercises': {
-        const exercises = getExercises();
+      case 'exercises':
         return (
-          <div className="placeholder-screen flex-column">
-            <h2>Atlas ćwiczeń</h2>
-            <p className="text-muted">Przeglądaj bibliotekę ćwiczeń lub dodaj własne customowe ruchy.</p>
-            <div className="form-group">
-              <input type="text" className="input-text" placeholder="Szukaj ćwiczenia..." disabled />
-            </div>
-            <div className="flex-column gap-12" style={{ marginTop: '8px' }}>
-              {exercises.map((ex) => (
-                <div key={ex.id} className="card">
-                  <div className="card-header">
-                    <h3>{ex.name}</h3>
-                    <span className="text-success" style={{ fontSize: '12px', background: 'rgba(0,255,135,0.1)', padding: '2px 8px', borderRadius: '4px' }}>
-                      {ex.category}
-                    </span>
-                  </div>
-                  {ex.notes && <p style={{ fontSize: '13px', marginTop: '4px' }}>{ex.notes}</p>}
-                </div>
-              ))}
-            </div>
-          </div>
+          <ExerciseLibrary />
         );
-      }
+
       case 'history': {
         const history = getHistory();
         return (

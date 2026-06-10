@@ -37,16 +37,16 @@ Poniższa lista zadań została przygotowana na podstawie [implementation_plan.m
 
 ## Krok 5: Harmonogram i Szablony Treningowe
 
-- [ ] **5.1. Zarządzanie biblioteką ćwiczeń (Exercise Library)**
+- [x] **5.1. Zarządzanie biblioteką ćwiczeń (Exercise Library)**
   - **Cel:** Stworzenie widoku pozwalającego na wyszukiwanie, przeglądanie i dodawanie nowych ćwiczeń.
   - **Warunek ukończenia:** Komponent [ExerciseLibrary.tsx](file:///c:/source/gymTracker/src/components/ExerciseLibrary.tsx) pozwala na:
     - Wyświetlenie domyślnych ćwiczeń.
     - Dodanie nowego ćwiczenia (np. "Wyciskanie na klatkę").
     - Filtrowanie listy po wpisaniu nazwy.
-- [ ] **5.2. Zarządzanie szablonami treningów (Workout Templates)**
+- [x] **5.2. Zarządzanie szablonami treningów (Workout Templates)**
   - **Cel:** Stworzenie widoku do tworzenia, edycji i usuwania planów treningowych (np. PUSH/PULL/LEGS) z określonymi dniami tygodnia.
   - **Warunek ukończenia:** Komponent [WorkoutTemplates.tsx](file:///c:/source/gymTracker/src/components/WorkoutTemplates.tsx) pozwala na stworzenie szablonu, dodanie do niego ćwiczeń z biblioteki, określenie liczby serii/powtórzeń, przypisanie dni treningowych (np. Poniedziałek, Środa) oraz zapisanie go w lokalnej bazie.
-- [ ] **5.3. Widok Harmonogramu (Workout Schedule)**
+- [x] **5.3. Widok Harmonogramu (Workout Schedule)**
   - **Cel:** Wyświetlanie aktualnego dnia i tygodnia oraz planowanego na dziś treningu.
   - **Warunek ukończenia:** Komponent [WorkoutSchedule.tsx](file:///c:/source/gymTracker/src/components/WorkoutSchedule.tsx) poprawnie odczytuje dzisiejszy dzień tygodnia, dopasowuje przypisany szablon i wyświetla przycisk "Rozpocznij trening" dla dzisiejszego szablonu lub dowolnego innego.
 
