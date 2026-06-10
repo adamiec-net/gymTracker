@@ -8,7 +8,7 @@
   - **Cel**: Dodać klucz storage i funkcje pobierania, zapisywania, usuwania wagi oraz automatycznej synchronizacji wagi z treningami w `src/services/storage.ts`. Zaktualizować import/eksport danych.
   - **Warunek ukończenia**: Metody `getWeightHistory`, `saveWeightLog`, `deleteWeightLog` oraz `syncWeightFromWorkout` działają poprawnie, a eksport/import obsługuje historię wagi.
 
-- `[ ]` **Zadanie 3: Implementacja modala edycji historycznych treningów (`WorkoutHistory.tsx`)**
+- [x] **Zadanie 3: Implementacja modala edycji historycznych treningów (`WorkoutHistory.tsx`)**
   - **Cel**: Dodać przycisk „Edytuj” do kart historii oraz stworzyć modal `EditWorkoutModal` pozwalający na pełną modyfikację treningu (nazwa, data, waga, ćwiczenia, serie) z automatyczną synchronizacją wagi.
   - **Warunek ukończenia**: Możliwość edycji dowolnego historycznego treningu w UI, zapisanie zmian aktualizuje listę treningów i bazę wagi.
 
