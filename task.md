@@ -16,10 +16,10 @@ Poniższa lista zadań została przygotowana na podstawie [implementation_plan.m
 
 ## Krok 2: Typy danych i Warstwa Przechowywania (Storage)
 
-- [ ] **2.1. Definicja modeli i typów TypeScript**
+- [x] **2.1. Definicja modeli i typów TypeScript**
   - **Cel:** Zdefiniowanie struktur danych dla ćwiczeń, szablonów, serii treningowych oraz historii treningów.
   - **Warunek ukończenia:** Plik [types.ts](file:///c:/source/gymTracker/src/types.ts) definiuje interfejsy: `Exercise`, `WorkoutSet`, `WorkoutExercise`, `WorkoutTemplate` oraz `LoggedWorkout`. Kod kompiluje się bez błędów typu.
-- [ ] **2.2. Implementacja serwisu Storage (`localStorage`)**
+- [x] **2.2. Implementacja serwisu Storage (`localStorage`)**
   - **Cel:** Stworzenie funkcji do odczytu i zapisu ćwiczeń, szablonów i historii treningów w `localStorage`, wraz z domyślną listą ćwiczeń (Pompki, Podciąganie nachwytem, Podciąganie podchwytem, Przysiady, Swing kettlem).
   - **Warunek ukończenia:** Plik [storage.ts](file:///c:/source/gymTracker/src/services/storage.ts) eksportuje funkcje: `getExercises`, `saveExercise`, `getTemplates`, `saveTemplate`, `getHistory`, `saveWorkout`, `exportData`, `importData`. Testy jednostkowe lub ręczne potwierdzają poprawność zapisu/odczytu.
 
