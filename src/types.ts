@@ -3,6 +3,7 @@ export interface Exercise {
   name: string;
   category: string;
   notes?: string;
+  isBodyweight?: boolean;
 }
 
 export interface WorkoutSet {
@@ -30,6 +31,7 @@ export interface LoggedWorkout {
   startTime: string; // ISO string representation
   endTime: string;   // ISO string representation
   exercises: WorkoutExercise[];
+  bodyWeight?: number;
 }
 
 export interface BackupData {
@@ -55,5 +57,9 @@ declare global {
 
 export interface AppSettings {
   defaultTimerDuration: number; // in seconds
+  userWeight?: number;
+  scheduleType?: 'weekly' | 'rotational';
+  rotationTemplates?: string[];
+  weeklyWorkoutTarget?: number;
 }
 

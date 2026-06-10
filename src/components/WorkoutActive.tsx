@@ -5,11 +5,12 @@ import { RestTimer } from './RestTimer';
 
 interface WorkoutActiveProps {
   template: WorkoutTemplate;
+  userWeight: number;
   onFinish: (logged: LoggedWorkout) => void;
   onCancel: () => void;
 }
 
-export function WorkoutActive({ template, onFinish, onCancel }: WorkoutActiveProps) {
+export function WorkoutActive({ template, userWeight, onFinish, onCancel }: WorkoutActiveProps) {
   // Track start time once when component mounts using initial state
   const [startTime] = useState(() => new Date().toISOString());
 
@@ -150,6 +151,7 @@ export function WorkoutActive({ template, onFinish, onCancel }: WorkoutActivePro
       startTime,
       endTime,
       exercises: exercises.filter((ex) => ex.sets.length > 0),
+      bodyWeight: userWeight,
     };
 
     // Save directly to storage

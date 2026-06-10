@@ -18,6 +18,7 @@ export function ExerciseLibrary() {
   const [newName, setNewName] = useState('');
   const [newCategory, setNewCategory] = useState('Klatka');
   const [newNotes, setNewNotes] = useState('');
+  const [newIsBodyweight, setNewIsBodyweight] = useState(false);
   const [error, setError] = useState('');
 
   const handleAddExercise = (e: FormEvent) => {
@@ -32,6 +33,7 @@ export function ExerciseLibrary() {
       name: newName.trim(),
       category: newCategory,
       notes: newNotes.trim() ? newNotes.trim() : undefined,
+      isBodyweight: newIsBodyweight,
     };
 
     const updated = saveExercise(updatedEx);
@@ -46,6 +48,7 @@ export function ExerciseLibrary() {
     setNewName(ex.name);
     setNewCategory(ex.category);
     setNewNotes(ex.notes || '');
+    setNewIsBodyweight(!!ex.isBodyweight);
     setIsModalOpen(true);
   };
 
@@ -55,6 +58,7 @@ export function ExerciseLibrary() {
     setNewName('');
     setNewCategory('Klatka');
     setNewNotes('');
+    setNewIsBodyweight(false);
     setError('');
   };
 
@@ -161,7 +165,12 @@ export function ExerciseLibrary() {
               style={{ cursor: 'pointer' }}
             >
               <div className="card-header">
-                <h3 style={{ fontSize: '16px', fontWeight: '600' }}>{ex.name}</h3>
+                <div className="flex-row align-center gap-6">
+                  <h3 style={{ fontSize: '16px', fontWeight: '600' }}>{ex.name}</h3>
+                  {ex.isBodyweight && (
+                    <span style={{ fontSize: '13px', opacity: 0.7, cursor: 'help' }} title="Ćwiczenie z ciężarem ciała">👤</span>
+                  )}
+                </div>
                 <span className="category-badge">
                   {ex.category}
                 </span>
@@ -223,6 +232,19 @@ export function ExerciseLibrary() {
                     </option>
                   ))}
                 </select>
+              </div>
+
+              <div className="form-group flex-row align-center gap-8" style={{ marginTop: '4px', marginBottom: '4px' }}>
+                <input
+                  type="checkbox"
+                  id="exercise-is-bodyweight"
+                  checked={newIsBodyweight}
+                  onChange={(e) => setNewIsBodyweight(e.target.checked)}
+                  style={{ width: '16px', height: '16px', cursor: 'pointer' }}
+                />
+                <label htmlFor="exercise-is-bodyweight" className="form-label" style={{ cursor: 'pointer', margin: 0, fontSize: '13px' }}>
+                  Ćwiczenie z ciężarem własnego ciała
+                </label>
               </div>
 
               <div className="form-group">

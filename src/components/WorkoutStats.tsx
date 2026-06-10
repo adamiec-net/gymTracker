@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { getExercises, getHistory } from '../services/storage';
+import { getExercises, getHistory, getSettings } from '../services/storage';
 import type { Exercise, LoggedWorkout } from '../types';
 
 interface ChartPoint {
@@ -10,6 +10,8 @@ interface ChartPoint {
   fullDateStr: string;
   maxWeight: number;
   estimated1RM: number;
+  bodyWeight: number;
+  weightY: number;
 }
 
 export function WorkoutStats() {
@@ -22,7 +24,9 @@ export function WorkoutStats() {
   const [metric, setMetric] = useState<'1rm' | 'maxWeight'>('1rm');
   const [activePointIdx, setActivePointIdx] = useState<number | null>(null);
 
+  const settings = getSettings();
   const selectedExercise = exercises.find((e) => e.id === selectedExerciseId);
+  const isBodyweight = selectedExercise?.isBodyweight || false;
 
   // Group and calculate stats chronologically
   const exerciseSessions = history
@@ -31,15 +35,20 @@ export function WorkoutStats() {
     )
     .map((workout) => {
       const workoutEx = workout.exercises.find((ex) => ex.exerciseId === selectedExerciseId)!;
+      const bw = workout.bodyWeight || settings.userWeight || 80;
       
-      // Calculate max weight in this session
-      const maxWeight = workoutEx.sets.reduce((max, s) => Math.max(max, s.weight), 0);
+      // Calculate max weight in this session (incorporating bodyweight if applicable)
+      const maxWeight = workoutEx.sets.reduce((max, s) => {
+        const effWeight = isBodyweight ? (s.weight + bw) : s.weight;
+        return Math.max(max, effWeight);
+      }, 0);
 
       // Calculate 1RM from completed sets, or fallback to all sets if no completed sets exist
       const completedSets = workoutEx.sets.filter((s) => s.completed);
       const targetSets = completedSets.length > 0 ? completedSets : workoutEx.sets;
       const estimated1RM = targetSets.reduce((max, s) => {
-        const epley = s.weight * (1 + s.reps / 30);
+        const effWeight = isBodyweight ? (s.weight + bw) : s.weight;
+        const epley = effWeight * (1 + s.reps / 30);
         return Math.max(max, epley);
       }, 0);
 
@@ -55,6 +64,7 @@ export function WorkoutStats() {
         }),
         maxWeight: parseFloat(maxWeight.toFixed(1)),
         estimated1RM: parseFloat(estimated1RM.toFixed(1)),
+        bodyWeight: bw,
       };
     });
 
@@ -71,14 +81,17 @@ export function WorkoutStats() {
   let points: ChartPoint[] = [];
   let lineD = '';
   let areaD = '';
+  let weightLineD = '';
   let gridLines: { y: number; val: string }[] = [];
   let minVal = 0;
   let maxVal = 0;
 
   if (exerciseSessions.length > 0) {
     const values = exerciseSessions.map((d) => (metric === '1rm' ? d.estimated1RM : d.maxWeight));
-    minVal = Math.min(...values);
-    maxVal = Math.max(...values);
+    const bwValues = exerciseSessions.map((d) => d.bodyWeight);
+    const allValues = [...values, ...bwValues];
+    minVal = Math.min(...allValues);
+    maxVal = Math.max(...allValues);
 
     // Padding for Y axis
     if (minVal === maxVal) {
@@ -99,6 +112,7 @@ export function WorkoutStats() {
         padding.left +
         (exerciseSessions.length > 1 ? (i / (exerciseSessions.length - 1)) * chartWidth : chartWidth / 2);
       const y = padding.top + chartHeight - ((val - minVal) / (maxVal - minVal)) * chartHeight;
+      const weightY = padding.top + chartHeight - ((d.bodyWeight - minVal) / (maxVal - minVal)) * chartHeight;
       return {
         x,
         y,
@@ -107,12 +121,15 @@ export function WorkoutStats() {
         fullDateStr: d.fullDateStr,
         maxWeight: d.maxWeight,
         estimated1RM: d.estimated1RM,
+        bodyWeight: d.bodyWeight,
+        weightY,
       };
     });
 
     if (points.length > 1) {
       lineD = `M ${points.map((p) => `${p.x} ${p.y}`).join(' L ')}`;
       areaD = `${lineD} L ${points[points.length - 1].x} ${padding.top + chartHeight} L ${points[0].x} ${padding.top + chartHeight} Z`;
+      weightLineD = `M ${points.map((p) => `${p.x} ${p.weightY}`).join(' L ')}`;
     }
 
     // Grid lines (Y axis ticks)
@@ -227,12 +244,12 @@ export function WorkoutStats() {
                 background: 'var(--bg-secondary)',
               }}
             >
-              <div className="flex-column" style={{ gap: '2px' }}>
+              <div className="flex-column" style={{ gap: '4px' }}>
                 <span className="text-muted" style={{ fontSize: '11px', textTransform: 'uppercase', fontWeight: 'bold' }}>
                   Sesja z {displayPoint.fullDateStr}
                 </span>
                 <span style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
-                  Szczegóły wybranego punktu:
+                  Waga ciała w tej sesji: <strong>{displayPoint.bodyWeight} kg</strong>
                 </span>
               </div>
               <div className="text-center">
@@ -314,6 +331,20 @@ export function WorkoutStats() {
                   <path d={areaD} fill="url(#chart-gradient)" />
                 )}
 
+                {/* Draw Body Weight Line */}
+                {points.length > 1 ? (
+                  <path
+                    d={weightLineD}
+                    fill="none"
+                    stroke="var(--text-secondary)"
+                    strokeWidth="1.5"
+                    strokeDasharray="4 4"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    opacity="0.6"
+                  />
+                ) : null}
+
                 {/* Draw Main Progress Line */}
                 {points.length > 1 ? (
                   <path
@@ -389,6 +420,18 @@ export function WorkoutStats() {
             <p className="text-center text-muted" style={{ fontSize: '11px', marginTop: '12px' }}>
               Wskazówka: Dotknij punktu na wykresie, aby zobaczyć szczegóły.
             </p>
+
+            {/* Legend */}
+            <div className="flex-row justify-center gap-16" style={{ marginTop: '8px', fontSize: '11px', borderTop: '1px solid var(--border)', paddingTop: '8px' }}>
+              <div className="flex-row align-center gap-4">
+                <div style={{ width: '12px', height: '3px', background: 'var(--accent)', borderRadius: '1px' }} />
+                <span className="text-muted">{metric === '1rm' ? 'Szacowany 1RM' : 'Maks. Ciężar'}</span>
+              </div>
+              <div className="flex-row align-center gap-4">
+                <div style={{ width: '12px', height: '1.5px', borderBottom: '1.5px dashed var(--text-secondary)', opacity: 0.6 }} />
+                <span className="text-muted">Waga ciała</span>
+              </div>
+            </div>
           </div>
 
           {/* Quick Stats overview */}

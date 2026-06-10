@@ -17,6 +17,13 @@ export function Settings() {
     saveSettings(updatedSettings);
   };
 
+  const handleUserWeightChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = parseFloat(e.target.value);
+    const updatedSettings = { ...settings, userWeight: isNaN(val) ? undefined : val };
+    setSettings(updatedSettings);
+    saveSettings(updatedSettings);
+  };
+
   useEffect(() => {
     const handleInstallable = (e: Event) => {
       const customEvent = e as CustomEvent<BeforeInstallPromptEvent>;
@@ -155,6 +162,21 @@ export function Settings() {
             <option value={120} style={{ backgroundColor: 'var(--bg-surface)' }}>2 minuty (120s)</option>
             <option value={180} style={{ backgroundColor: 'var(--bg-surface)' }}>3 minuty (180s)</option>
           </select>
+        </div>
+
+        <div className="form-group flex-column gap-4">
+          <label className="form-label" style={{ fontSize: '13px' }}>
+            Waga użytkownika (kg):
+          </label>
+          <input
+            type="number"
+            className="input-text"
+            value={settings.userWeight || ''}
+            onChange={handleUserWeightChange}
+            placeholder="np. 80"
+            step="0.1"
+            min="0"
+          />
         </div>
       </div>
 

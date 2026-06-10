@@ -8,10 +8,10 @@ const STORAGE_KEYS = {
 };
 
 const DEFAULT_EXERCISES: Exercise[] = [
-  { id: 'def-pompki', name: 'Pompki', category: 'Klatka piersiowa', notes: 'Klasyczne pompki na ziemi' },
-  { id: 'def-podciaganie-nachwyt', name: 'Podciąganie nachwytem', category: 'Plecy', notes: 'Chwyt nachwytem na szerokość barków' },
-  { id: 'def-podciaganie-podchwyt', name: 'Podciąganie podchwytem', category: 'Plecy', notes: 'Chwyt podchwytem na szerokość barków' },
-  { id: 'def-przysiady', name: 'Przysiady', category: 'Nogi', notes: 'Przysiady bez obciążenia lub ze sztangą' },
+  { id: 'def-pompki', name: 'Pompki', category: 'Klatka piersiowa', notes: 'Klasyczne pompki na ziemi', isBodyweight: true },
+  { id: 'def-podciaganie-nachwyt', name: 'Podciąganie nachwytem', category: 'Plecy', notes: 'Chwyt nachwytem na szerokość barków', isBodyweight: true },
+  { id: 'def-podciaganie-podchwyt', name: 'Podciąganie podchwytem', category: 'Plecy', notes: 'Chwyt podchwytem na szerokość barków', isBodyweight: true },
+  { id: 'def-przysiady', name: 'Przysiady', category: 'Nogi', notes: 'Przysiady bez obciążenia lub ze sztangą', isBodyweight: true },
   { id: 'def-swing-kettlem', name: 'Swing kettlem', category: 'Kettlebell', notes: 'Swing oburącz z odważnikiem' },
 ];
 
@@ -59,6 +59,10 @@ export const deleteExercise = (id: string): Exercise[] => {
 
 const DEFAULT_SETTINGS: AppSettings = {
   defaultTimerDuration: 90,
+  userWeight: 80,
+  scheduleType: 'weekly',
+  rotationTemplates: [],
+  weeklyWorkoutTarget: 3,
 };
 
 /**
