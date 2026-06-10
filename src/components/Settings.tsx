@@ -1,14 +1,18 @@
 import { useState, useEffect, useRef } from 'react';
 import { exportData, importData, resetAllData } from '../services/storage';
+import type { BeforeInstallPromptEvent } from '../types';
 
 export function Settings() {
-  const [deferredPrompt, setDeferredPrompt] = useState<any>((window as any).deferredPrompt || null);
+  const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(
+    window.deferredPrompt || null
+  );
   const [importError, setImportError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    const handleInstallable = (e: any) => {
-      setDeferredPrompt(e.detail);
+    const handleInstallable = (e: Event) => {
+      const customEvent = e as CustomEvent<BeforeInstallPromptEvent>;
+      setDeferredPrompt(customEvent.detail);
     };
     window.addEventListener('pwa-installable', handleInstallable as EventListener);
     return () => {
@@ -28,8 +32,9 @@ export function Settings() {
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
-    } catch (err: any) {
-      alert(`Błąd podczas eksportowania danych: ${err.message || err}`);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      alert(`Błąd podczas eksportowania danych: ${msg}`);
     }
   };
 
@@ -57,9 +62,10 @@ export function Settings() {
         } else {
           throw new Error('Import zwrócił niepowodzenie');
         }
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error(err);
-        setImportError(err.message || 'Niepoprawny format pliku JSON.');
+        const msg = err instanceof Error ? err.message : 'Niepoprawny format pliku JSON.';
+        setImportError(msg);
       }
     };
     reader.onerror = () => {
@@ -82,14 +88,14 @@ export function Settings() {
     if (!deferredPrompt) return;
     
     // Show the install prompt
-    deferredPrompt.prompt();
+    await deferredPrompt.prompt();
     
     // Wait for the user to respond to the prompt
     const { outcome } = await deferredPrompt.userChoice;
     console.log(`User response to the install prompt: ${outcome}`);
     
     // We've used the prompt, and can't use it again, clear it
-    (window as any).deferredPrompt = null;
+    window.deferredPrompt = null;
     setDeferredPrompt(null);
   };
 

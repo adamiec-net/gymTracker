@@ -78,6 +78,6 @@ Poniższa lista zadań została przygotowana na podstawie [implementation_plan.m
 
 ## Krok 8: Integracja i Walidacja Końcowa
 
-- [ ] **8.1. Integracja w App.tsx i walidacja PWA**
+- [x] **8.1. Integracja w App.tsx i walidacja PWA**
   - **Cel:** Połączenie wszystkich widoków w jedną spójną aplikację oraz testowanie zachowania offline.
   - **Warunek ukończenia:** Cała aplikacja działa poprawnie, przejścia między widokami są płynne. Narzędzie Lighthouse w przeglądarce potwierdza zgodność z wymaganiami PWA (aplikacja jest instalowalna i działa offline).

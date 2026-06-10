@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { getTemplates } from '../services/storage';
 import type { WorkoutTemplate } from '../types';
 
@@ -17,16 +17,11 @@ const WEEK_DAYS = [
 ];
 
 export function WorkoutSchedule({ onStartWorkout }: WorkoutScheduleProps) {
-  const [templates, setTemplates] = useState<WorkoutTemplate[]>([]);
-  const [selectedQuickTemplateId, setSelectedQuickTemplateId] = useState('');
-
-  useEffect(() => {
+  const [templates] = useState<WorkoutTemplate[]>(() => getTemplates());
+  const [selectedQuickTemplateId, setSelectedQuickTemplateId] = useState(() => {
     const allTemplates = getTemplates();
-    setTemplates(allTemplates);
-    if (allTemplates.length > 0) {
-      setSelectedQuickTemplateId(allTemplates[0].id);
-    }
-  }, []);
+    return allTemplates.length > 0 ? allTemplates[0].id : '';
+  });
 
   const todayNum = new Date().getDay(); // 0 = Sun, 1 = Mon, ...
   

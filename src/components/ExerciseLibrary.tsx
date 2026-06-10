@@ -1,4 +1,4 @@
-import { useState, useEffect, type FormEvent } from 'react';
+import { useState, type FormEvent } from 'react';
 import { getExercises, saveExercise } from '../services/storage';
 import type { Exercise } from '../types';
 
@@ -8,7 +8,7 @@ const PRESETS = {
 };
 
 export function ExerciseLibrary() {
-  const [exercises, setExercises] = useState<Exercise[]>([]);
+  const [exercises, setExercises] = useState<Exercise[]>(() => getExercises());
   const [search, setSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('Wszystkie');
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -18,10 +18,6 @@ export function ExerciseLibrary() {
   const [newCategory, setNewCategory] = useState('Klatka');
   const [newNotes, setNewNotes] = useState('');
   const [error, setError] = useState('');
-
-  useEffect(() => {
-    setExercises(getExercises());
-  }, []);
 
   const handleAddExercise = (e: FormEvent) => {
     e.preventDefault();
@@ -51,7 +47,7 @@ export function ExerciseLibrary() {
   const filteredExercises = exercises.filter((ex) => {
     const matchesSearch = ex.name.toLowerCase().includes(search.toLowerCase());
     
-    let matchesCategory = false;
+    let matchesCategory: boolean;
     if (selectedCategory === 'Wszystkie') {
       matchesCategory = true;
     } else {

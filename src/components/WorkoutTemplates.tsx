@@ -1,4 +1,4 @@
-import { useState, useEffect, type FormEvent } from 'react';
+import { useState, type FormEvent } from 'react';
 import { getTemplates, saveTemplate, deleteTemplate, getExercises } from '../services/storage';
 import type { WorkoutTemplate, WorkoutExercise, WorkoutSet, Exercise } from '../types';
 
@@ -17,8 +17,8 @@ const WEEKDAYS = [
 ];
 
 export function WorkoutTemplates({ onStartWorkout }: WorkoutTemplatesProps) {
-  const [templates, setTemplates] = useState<WorkoutTemplate[]>([]);
-  const [exercisesLibrary, setExercisesLibrary] = useState<Exercise[]>([]);
+  const [templates, setTemplates] = useState<WorkoutTemplate[]>(() => getTemplates());
+  const [exercisesLibrary, setExercisesLibrary] = useState<Exercise[]>(() => getExercises());
   
   // Editor state
   const [isEditing, setIsEditing] = useState(false);
@@ -29,12 +29,9 @@ export function WorkoutTemplates({ onStartWorkout }: WorkoutTemplatesProps) {
   const [selectedExerciseId, setSelectedExerciseId] = useState('');
   const [editorError, setEditorError] = useState('');
 
-  useEffect(() => {
-    setTemplates(getTemplates());
-    setExercisesLibrary(getExercises());
-  }, [isEditing]);
-
   const handleCreateNew = () => {
+    const lib = getExercises();
+    setExercisesLibrary(lib);
     setEditId(null);
     setName('');
     setScheduleDays([]);
@@ -42,7 +39,6 @@ export function WorkoutTemplates({ onStartWorkout }: WorkoutTemplatesProps) {
     setEditorError('');
     setIsEditing(true);
 
-    const lib = getExercises();
     if (lib.length > 0) {
       setSelectedExerciseId(lib[0].id);
     } else {
@@ -51,6 +47,8 @@ export function WorkoutTemplates({ onStartWorkout }: WorkoutTemplatesProps) {
   };
 
   const handleEdit = (tpl: WorkoutTemplate) => {
+    const lib = getExercises();
+    setExercisesLibrary(lib);
     setEditId(tpl.id);
     setName(tpl.name);
     setScheduleDays(tpl.scheduleDays);
@@ -58,7 +56,6 @@ export function WorkoutTemplates({ onStartWorkout }: WorkoutTemplatesProps) {
     setEditorError('');
     setIsEditing(true);
 
-    const lib = getExercises();
     if (lib.length > 0) {
       setSelectedExerciseId(lib[0].id);
     } else {
@@ -176,7 +173,8 @@ export function WorkoutTemplates({ onStartWorkout }: WorkoutTemplatesProps) {
       scheduleDays,
     };
 
-    saveTemplate(tpl);
+    const updated = saveTemplate(tpl);
+    setTemplates(updated);
     setIsEditing(false);
   };
 

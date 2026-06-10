@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { getExercises, getHistory } from '../services/storage';
 import type { Exercise, LoggedWorkout } from '../types';
 
@@ -13,27 +13,14 @@ interface ChartPoint {
 }
 
 export function WorkoutStats() {
-  const [exercises, setExercises] = useState<Exercise[]>([]);
-  const [history, setHistory] = useState<LoggedWorkout[]>([]);
-  const [selectedExerciseId, setSelectedExerciseId] = useState<string>('');
+  const [exercises] = useState<Exercise[]>(() => getExercises());
+  const [history] = useState<LoggedWorkout[]>(() => getHistory());
+  const [selectedExerciseId, setSelectedExerciseId] = useState<string>(() => {
+    const loadedExercises = getExercises();
+    return loadedExercises.length > 0 ? loadedExercises[0].id : '';
+  });
   const [metric, setMetric] = useState<'1rm' | 'maxWeight'>('1rm');
   const [activePointIdx, setActivePointIdx] = useState<number | null>(null);
-
-  useEffect(() => {
-    const loadedExercises = getExercises();
-    const loadedHistory = getHistory();
-    setExercises(loadedExercises);
-    setHistory(loadedHistory);
-
-    if (loadedExercises.length > 0) {
-      setSelectedExerciseId(loadedExercises[0].id);
-    }
-  }, []);
-
-  // When selected exercise changes, reset the active point index to null
-  useEffect(() => {
-    setActivePointIdx(null);
-  }, [selectedExerciseId]);
 
   const selectedExercise = exercises.find((e) => e.id === selectedExerciseId);
 
@@ -162,7 +149,10 @@ export function WorkoutStats() {
             id="exercise-select"
             className="input-text"
             value={selectedExerciseId}
-            onChange={(e) => setSelectedExerciseId(e.target.value)}
+            onChange={(e) => {
+              setSelectedExerciseId(e.target.value);
+              setActivePointIdx(null);
+            }}
             style={{
               appearance: 'none',
               backgroundImage: 'url("data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'24\' height=\'24\' viewBox=\'0 0 24 24\' fill=\'none\' stroke=\'%23ffffff\' stroke-width=\'2\' stroke-linecap=\'round\' stroke-linejoin=\'round\'><polyline points=\'6 9 12 15 18 9\'></polyline></svg>")',

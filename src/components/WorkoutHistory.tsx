@@ -1,15 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { getHistory, deleteWorkout, getExercises } from '../services/storage';
 import type { LoggedWorkout, Exercise } from '../types';
 
 export function WorkoutHistory() {
-  const [history, setHistory] = useState<LoggedWorkout[]>([]);
-  const [exercises, setExercises] = useState<Exercise[]>([]);
-
-  useEffect(() => {
-    setHistory(getHistory());
-    setExercises(getExercises());
-  }, []);
+  const [history, setHistory] = useState<LoggedWorkout[]>(() => getHistory());
+  const [exercises] = useState<Exercise[]>(() => getExercises());
 
   const handleDelete = (id: string) => {
     if (window.confirm('Czy na pewno chcesz usunąć ten trening z historii? Tej operacji nie można cofnąć.')) {
