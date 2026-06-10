@@ -34,10 +34,19 @@ export interface LoggedWorkout {
   bodyWeight?: number;
 }
 
+export interface WeightLog {
+  id: string;
+  date: string; // ISO String (data wpisu)
+  weight: number;
+  source: 'manual' | 'workout';
+  workoutId?: string; // ID treningu, jeśli waga pochodzi z treningu
+}
+
 export interface BackupData {
   exercises: Exercise[];
   templates: WorkoutTemplate[];
   history: LoggedWorkout[];
+  weightHistory?: WeightLog[]; // Opcjonalne pole dla kompatybilności wstecznej
 }
 
 export interface BeforeInstallPromptEvent extends Event {

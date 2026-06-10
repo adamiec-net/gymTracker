@@ -1,6 +1,6 @@
 # Lista Zadań - Zaawansowane Statystyki i Edycja Historyczna
 
-- `[ ]` **Zadanie 1: Aktualizacja modeli danych (`types.ts`)**
+- [x] **Zadanie 1: Aktualizacja modeli danych (`types.ts`)**
   - **Cel**: Dodać interfejs `WeightLog` oraz zaktualizować `BackupData` w celu wsparcia nowej struktury danych.
   - **Warunek ukończenia**: Kompilacja kodu w `src/types.ts` przechodzi bez błędów, a typy są poprawnie eksportowane.
 
