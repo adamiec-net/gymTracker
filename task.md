@@ -4,7 +4,7 @@
   - **Cel**: Dodać interfejs `WeightLog` oraz zaktualizować `BackupData` w celu wsparcia nowej struktury danych.
   - **Warunek ukończenia**: Kompilacja kodu w `src/types.ts` przechodzi bez błędów, a typy są poprawnie eksportowane.
 
-- `[ ]` **Zadanie 2: Implementacja logiki przechowywania danych wagi (`storage.ts`)**
+- [x] **Zadanie 2: Implementacja logiki przechowywania danych wagi (`storage.ts`)**
   - **Cel**: Dodać klucz storage i funkcje pobierania, zapisywania, usuwania wagi oraz automatycznej synchronizacji wagi z treningami w `src/services/storage.ts`. Zaktualizować import/eksport danych.
   - **Warunek ukończenia**: Metody `getWeightHistory`, `saveWeightLog`, `deleteWeightLog` oraz `syncWeightFromWorkout` działają poprawnie, a eksport/import obsługuje historię wagi.
 
