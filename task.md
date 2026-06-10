@@ -52,7 +52,7 @@ Poniższa lista zadań została przygotowana na podstawie [implementation_plan.m
 
 ## Krok 6: Aktywny Trening i Minutnik
 
-- [ ] **6.1. Widok aktywnego treningu (Workout Active)**
+- [x] **6.1. Widok aktywnego treningu (Workout Active)**
   - **Cel:** Ekran śledzenia treningu w czasie rzeczywistym z odznaczaniem serii, zmianą powtórzeń/ciężaru i dodawaniem ćwiczeń.
   - **Warunek ukończenia:** Komponent [WorkoutActive.tsx](file:///c:/source/gymTracker/src/components/WorkoutActive.tsx) pozwala na:
     - Wyświetlenie ćwiczeń z szablonu.
@@ -60,7 +60,7 @@ Poniższa lista zadań została przygotowana na podstawie [implementation_plan.m
     - Zmianę liczby powtórzeń i ciężaru w locie.
     - Dodanie nowego ćwiczenia "ad-hoc" w trakcie trwania sesji.
     - Zakończenie treningu (zapisuje dane z aktualnym czasem i przenosi do historii).
-- [ ] **6.2. Komponent Minutnika Odpoczynku (Rest Timer)**
+- [x] **6.2. Komponent Minutnika Odpoczynku (Rest Timer)**
   - **Cel:** Odliczanie czasu odpoczynku między seriami z sygnałem dźwiękowym/wibracją.
   - **Warunek ukończenia:** Komponent [RestTimer.tsx](file:///c:/source/gymTracker/src/components/RestTimer.tsx) uruchamia się automatycznie po zaznaczeniu serii lub ręcznie, odlicza czas w dół, posiada przyciski pauzy/pomięcia/dodania czasu, oraz odtwarza krótki dźwięk po zakończeniu odliczania.
 

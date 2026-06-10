@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import { Navigation } from './components/Navigation';
 import type { Tab } from './components/Navigation';
-import { getExercises, getHistory } from './services/storage';
+import { getHistory } from './services/storage';
 import { WorkoutSchedule } from './components/WorkoutSchedule';
 import { WorkoutTemplates } from './components/WorkoutTemplates';
 import { ExerciseLibrary } from './components/ExerciseLibrary';
+import { WorkoutActive } from './components/WorkoutActive';
 import type { WorkoutTemplate } from './types';
 import './App.css';
 
@@ -33,33 +34,16 @@ function App() {
         </header>
         
         <main className="app-content">
-          <div className="placeholder-screen flex-column text-center justify-center align-center" style={{ padding: '32px 16px', gap: '20px', height: '100%' }}>
-            <span className="text-success" style={{ fontSize: '14px', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '1px' }}>
-              Trening w toku
-            </span>
-            <h2 style={{ fontSize: '24px' }}>{activeWorkout.name}</h2>
-            <p className="text-muted">
-              To jest tymczasowy ekran aktywnego treningu. W kolejnym kroku zaimplementujemy pełne śledzenie serii.
-            </p>
-            <div className="card" style={{ width: '100%', padding: '16px' }}>
-              <h3 style={{ textAlign: 'left' }}>Ćwiczenia do wykonania:</h3>
-              <ul style={{ listStyle: 'none', padding: 0, marginTop: '8px', textAlign: 'left' }}>
-                {activeWorkout.exercises.map((e, idx) => (
-                  <li key={idx} style={{ padding: '6px 0', borderBottom: '1px solid var(--border)', fontSize: '14px' }} className="flex-row justify-between">
-                    <span>{getExercises().find(ex => ex.id === e.exerciseId)?.name || 'Nieznane ćwiczenie'}</span>
-                    <span className="text-muted">{e.sets.length} serii</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-            <button 
-              className="btn btn-success btn-full" 
-              onClick={() => setActiveWorkout(null)}
-              style={{ marginTop: '12px', padding: '14px 20px' }}
-            >
-              Zakończ trening
-            </button>
-          </div>
+          <WorkoutActive
+            template={activeWorkout}
+            onFinish={() => {
+              setActiveWorkout(null);
+              setActiveTab('history');
+            }}
+            onCancel={() => {
+              setActiveWorkout(null);
+            }}
+          />
         </main>
       </div>
     );
