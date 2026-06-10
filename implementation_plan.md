@@ -1,137 +1,99 @@
-# Gym Tracker PWA - Implementation Plan
+# Zaawansowane Statystyki i Panel Treningowy (Dashboard)
 
-A Progressive Web App (PWA) gym tracker built using React + Vite + TypeScript. The application is designed to run locally in the browser and be installable on Android devices, featuring a sleek modern minimalist dark theme. All workout data is stored locally in the browser's `localStorage` with options to export and import backups.
+Wprowadzenie dedykowanego śledzenia wagi, korelacji wagi z siłą/wydolnością w ćwiczeniach kalistenicznych oraz możliwości pełnej edycji historycznych treningów i wagi ciała.
 
-## User Review Required
-None.
+## Informacje i Podsumowanie ustaleń z wywiadu
+- **Rozdzielenie wagi od ćwiczeń kalistenicznych**: Ćwiczenia z masą ciała nie będą automatycznie dodawać wagi użytkownika do obciążeń. Zamiast tego będą śledzone za pomocą dedykowanych metryk: Maksymalne powtórzenia, Suma powtórzeń, Maksymalny dodatkowy ciężar oraz Objętość dodatkowego ciężaru.
+- **Dedykowany moduł wagi**: Dodanie osobnej zakładki dla wagi ciała z wykresem trendu, listą wpisów historycznych (z możliwością dodawania, edycji i usuwania) oraz statystykami.
+- **Pełna synchronizacja wagi**: Waga wpisana podczas rozpoczęcia treningu będzie synchronizowana z historią wagi na dany dzień. Edycje wagi w treningu lub w panelu wagi będą się automatycznie propagować.
+- **Korelacja postępów**: Dedykowany wykres korelacyjny porównujący wagę użytkownika (np. na osi lewej) ze wskaźnikami wydolności w wybranym ćwiczeniu kalistenicznym (np. maks. powtórzenia podciągania na osi prawej).
+- **Edycja historii treningów**: Każdy trening w zakładce historia otrzyma przycisk "Edytuj", otwierający modal pozwalający na modyfikację nazwy, daty, wagi oraz serii (dodawanie/usuwanie, powtórzenia, ciężar, status wykonania).
 
-## Open Questions
-None.
+## Proponowane Zmiany
 
-## Proposed Changes
+---
 
-### Setup and Configuration
+### Typy i Model Danych
 
-#### [NEW] [package.json](file:///c:/source/gymTracker/package.json)
-We will initialize the Vite React TypeScript application.
+#### [MODIFY] [types.ts](file:///c:/source/gymTracker/src/types.ts)
+- Dodanie typu `WeightLog` przechowującego wpisy o wadze:
+  ```typescript
+  export interface WeightLog {
+    id: string;
+    date: string; // ISO String (data wpisu)
+    weight: number;
+    source: 'manual' | 'workout';
+    workoutId?: string; // ID treningu, jeśli waga pochodzi z treningu
+  }
+  ```
+- Zaktualizowanie `BackupData` w celu wsparcia importu i eksportu historii wagi:
+  ```typescript
+  export interface BackupData {
+    exercises: Exercise[];
+    templates: WorkoutTemplate[];
+    history: LoggedWorkout[];
+    weightHistory?: WeightLog[]; // Opcjonalne pole dla kompatybilności wstecznej
+  }
+  ```
 
-#### [NEW] [vite.config.ts](file:///c:/source/gymTracker/vite.config.ts)
-Configure Vite to support building the PWA. We will configure basic asset copy or write custom steps to handle the PWA assets.
+---
 
-#### [NEW] [public/manifest.json](file:///c:/source/gymTracker/public/manifest.json)
-PWA web app manifest to allow installation on Android. It will specify the app name, start URL, theme color, background color, display mode (`standalone`), and app icons.
+### Logika Aplikacji i Storage
 
-#### [NEW] [public/sw.js](file:///c:/source/gymTracker/public/sw.js)
-A lightweight service worker to handle offline caching of assets and basic offline operation.
+#### [MODIFY] [storage.ts](file:///c:/source/gymTracker/src/services/storage.ts)
+- Dodanie klucza `STORAGE_KEYS.WEIGHT_HISTORY = 'gym_tracker_weight_history'`.
+- Implementacja metod pomocniczych:
+  - `getWeightHistory()`: Pobieranie posortowanej chronologicznie historii wagi.
+  - `saveWeightLog(log: WeightLog)`: Zapis/aktualizacja wpisu wagi.
+  - `deleteWeightLog(id: string)`: Usunięcie wpisu wagi.
+  - `syncWeightFromWorkout(workout: LoggedWorkout)`: Automatyczne tworzenie/aktualizacja wpisu wagi skojarzonego z treningiem.
+- Modyfikacja `saveWorkout()` i `deleteWorkout()` w celu wywoływania automatycznej synchronizacji wagi.
+- Zaktualizowanie funkcji `importData()` oraz `exportData()` o klucz `weightHistory`, dbając o zachowanie kompatibiności wstecznej.
+- Dodanie czyszczenia wagi do `resetAllData()`.
 
-#### [NEW] [src/registerServiceWorker.ts](file:///c:/source/gymTracker/src/registerServiceWorker.ts)
-Script to register the service worker on application startup.
+---
 
-### Core Logic and Types
+### Komponenty Interfejsu
 
-#### [NEW] [src/types.ts](file:///c:/source/gymTracker/src/types.ts)
-Define data structures:
-- `Exercise`: `id`, `name`, `category`, `notes`
-- `WorkoutSet`: `reps`, `weight`, `completed`
-- `WorkoutExercise`: `exerciseId`, `sets`: `WorkoutSet[]`
-- `WorkoutTemplate`: `id`, `name`, `exercises`: `WorkoutExercise[]`, `scheduleDays`: `number[]` (0=Sun, 1=Mon, ..., 6=Sat)
-- `LoggedWorkout`: `id`, `templateId` (optional), `name`, `startTime`, `endTime`, `exercises`: `WorkoutExercise[]`
+#### [MODIFY] [WorkoutStats.tsx](file:///c:/source/gymTracker/src/components/WorkoutStats.tsx)
+Przebudowanie widoku statystyk na interfejs z 3 zakładkami:
+1. **Ćwiczenia**:
+   - Wybór ćwiczenia z dropdownu.
+   - Dla standardowych ćwiczeń metryki: Szacowany 1RM, Maksymalny Ciężar, Suma Objętości (ciężar × powtórzenia), Maksymalne Powtórzenia.
+   - Dla ćwiczeń kalistenicznych (`isBodyweight: true`): Maksymalne Powtórzenia w serii, Suma Powtórzeń, Maksymalny Dodatkowy Ciężar, Objętość (tylko dodatkowy ciężar).
+   - Wykres SVG dostosowany do wybranej metryki.
+2. **Waga Ciała**:
+   - Wykres SVG przedstawiający wagę użytkownika na przestrzeni czasu.
+   - Szybkie podsumowanie: Aktualna waga, najniższa/najwyższa waga, zmiana w 7 i 30 dniach.
+   - Formularz szybkiego dodawania wagi dla wybranego dnia.
+   - Lista historycznych wpisów wagi z przyciskami Edycji (inline lub modal) oraz Usuwania.
+3. **Korelacja**:
+   - Analiza wpływu wagi ciała na wydolność w ćwiczeniach kalistenicznych.
+   - Wykres dwuosiowy (Dual-axis / Dwa wykresy na jednym polu) pokazujący np. wagę ciała (linia przerywana) oraz maks. powtórzenia podciągania (linia ciągła).
+   - Motywacyjny opis wskazujący, jak zmiana wagi ułatwia/utrudnia wykonywanie ćwiczeń kalistenicznych.
 
-#### [NEW] [src/services/storage.ts](file:///c:/source/gymTracker/src/services/storage.ts)
-Manage local storage for:
-- Exercises list (preloaded with default values: Pompki, Podciąganie nachwytem, Podciąganie podchwytem, Przysiady, Swing kettlem)
-- Workout templates
-- Workout history
-- Export/Import helper to export/import JSON.
+#### [MODIFY] [WorkoutHistory.tsx](file:///c:/source/gymTracker/src/components/WorkoutHistory.tsx)
+- Dodanie przycisku „Edytuj” przy każdym wpisie treningu w historii.
+- Implementacja modala do edycji treningu (`EditWorkoutModal`), który pozwala na:
+  - Zmianę nazwy treningu.
+  - Zmianę daty wykonania (input daty i godziny).
+  - Zmianę zalogowanej wagi ciała użytkownika.
+  - Pełną modyfikację listy ćwiczeń i serii (edycja liczby powtórzeń, ciężaru, dodawanie nowych serii, usuwanie istniejących serii, przełączanie checkboxa ukończenia).
+  - Zapisanie zmian: aktualizuje `LoggedWorkout` w historii, aktualizuje zsynchronizowany wpis wagi w historii wagi, odświeża widok.
 
-### UI Styling
+## Plan Weryfikacji
 
-#### [NEW] [src/index.css](file:///c:/source/gymTracker/src/index.css)
-Establish the modern minimalist dark theme design system:
-- High contrast dark backgrounds (`#121212`, `#1e1e1e`, `#2d2d2d`).
-- Clean minimalist typography (using system fonts or Inter if available, sizing, spacing).
-- Accent colors (minimalist gray/white with a primary cyan/blue or electric accent for active actions and checkmarks).
-- Modern minimalist components (clean borders, no heavy shadows, sharp or slightly rounded corners, clear active states).
-- Layout: full screen mobile layout with bottom navigation or clean top tabs.
-
-### Components
-
-#### [NEW] [src/components/Navigation.tsx](file:///c:/source/gymTracker/src/components/Navigation.tsx)
-Bottom or side navigation bar to switch between views:
-- Schedule / Home
-- Workouts / Templates
-- Exercise Library
-- History
-- Statistics
-- Settings
-
-#### [NEW] [src/components/WorkoutSchedule.tsx](file:///c:/source/gymTracker/src/components/WorkoutSchedule.tsx)
-Shows the training schedule. Displays current day and week days, showing which workout template is planned for today. Provides a quick action to start today's workout.
-
-#### [NEW] [src/components/WorkoutTemplates.tsx](file:///c:/source/gymTracker/src/components/WorkoutTemplates.tsx)
-Manage pre-defined workout templates:
-- View templates (e.g. PUSH, PULL, LEGS).
-- Add/Edit/Delete templates.
-- Define planned sets, reps, and default weights.
-- Configure schedule days.
-
-#### [NEW] [src/components/ExerciseLibrary.tsx](file:///c:/source/gymTracker/src/components/ExerciseLibrary.tsx)
-Manage exercises:
-- View predefined exercises.
-- Create new custom exercises.
-- Search/filter exercises.
-
-#### [NEW] [src/components/WorkoutActive.tsx](file:///c:/source/gymTracker/src/components/WorkoutActive.tsx)
-The active workout interface (workout tracker):
-- Real-time logging of sets, reps, weight.
-- Interactive checkboxes to mark sets as done.
-- Shows planned vs actual values.
-- Quick buttons to add/remove sets.
-- Integrated Rest Timer component.
-- Add exercise on-the-fly.
-- "Finish Workout" button (validates and saves to history, triggers success screen).
-
-#### [NEW] [src/components/RestTimer.tsx](file:///c:/source/gymTracker/src/components/RestTimer.tsx)
-Rest timer that runs in the active workout:
-- Countdown timer (e.g., 60s, 90s, 120s or custom).
-- Visual circular progress or minimalist digital clock.
-- Start/Pause/Skip buttons.
-- Play sound/vibrate when finished (if browser permissions allow).
-
-#### [NEW] [src/components/WorkoutHistory.tsx](file:///c:/source/gymTracker/src/components/WorkoutHistory.tsx)
-View past logged workouts:
-- Scrollable list of previous sessions.
-- Detailed view of completed sets/weight/reps.
-- Delete entries.
-
-#### [NEW] [src/components/WorkoutStats.tsx](file:///c:/source/gymTracker/src/components/WorkoutStats.tsx)
-Visualize progress:
-- Select an exercise to see progress.
-- Simple minimalist chart showing 1RM estimate or max weight/volume per workout session.
-
-#### [NEW] [src/components/Settings.tsx](file:///c:/source/gymTracker/src/components/Settings.tsx)
-App management:
-- Export data to a JSON file.
-- Import data from a JSON file (validation + loading).
-- Clear all data button (with confirm).
-- PWA Installation info/status.
-
-### Main App Assembly
-
-#### [MODIFY] [src/App.tsx](file:///c:/source/gymTracker/src/App.tsx)
-Main router and layout coordinator. Integrates state management (active workout state, current active tab, rest timer state).
-
-## Verification Plan
-
-### Manual Verification
-1. Run application in development mode (`npm run dev`) and test core workflows:
-   - Browse default exercises and add a custom one.
-   - Create a template "Trening A", add exercises, define sets/reps, set schedule.
-   - Start active workout from "Trening A".
-   - Modify actual reps/weight, complete sets, trigger rest timer.
-   - Finish workout, verify it saves to History.
-   - Check Statistics for the exercise to see if progress registers.
-   - Test Backup/Restore (export to JSON, clear data, import JSON, verify recovery).
-2. Validate PWA manifest and service worker:
-   - Check browser DevTools Application panel for manifest parsing and Service Worker registration.
-   - Emulate offline mode in DevTools and refresh the page to verify asset caching.
+### Weryfikacja Ręczna
+1. **Uruchomienie serwera deweloperskiego**: `npm run dev` i sprawdzenie poprawności kompilacji kodu.
+2. **Testy synchronizacji wagi**:
+   - Rozpoczęcie i zakończenie treningu z podaną wagą (np. 82 kg). Sprawdzenie, czy w zakładce "Waga Ciała" pojawił się wpis z tą wagą i datą treningu.
+   - Dodanie wagi ręcznie w zakładce "Waga Ciała" (np. 81.5 kg) na dzisiaj. Sprawdzenie, czy wykres wagi i lista historii wagi zaktualizowały się poprawnie.
+   - Usunięcie/edycja wpisu wagi z listy i sprawdzenie, czy wykres się odświeżył.
+3. **Testy edycji treningów historycznych**:
+   - Kliknięcie przycisku "Edytuj" na starym treningu.
+   - Zmiana wagi ciała w treningu z 82 na 80 kg. Zapisanie. Zweryfikowanie, czy waga zmieniła się zarówno w treningu, jak i w ogólnej historii wagi na ten dzień.
+   - Dodanie serii, zmiana powtórzeń w ćwiczeniu podciągania, zapisanie i sprawdzenie poprawności wyświetlania w historii.
+4. **Testy wykresów**:
+   - Wybranie podciągania i sprawdzenie, czy w zakładce "Ćwiczenia" waga ciała użytkownika nie jest doliczana do ciężaru (np. jeśli podciągamy się bez ciężaru, powinno pokazywać 0 kg dodatkowego ciężaru, a postęp ma być widoczny w powtórzeniach).
+   - Sprawdzenie poprawności działania nowo dodanych metryk (Suma powtórzeń, Maks. powtórzenia).
+   - Zweryfikowanie wykresu korelacji w trzeciej zakładce.
