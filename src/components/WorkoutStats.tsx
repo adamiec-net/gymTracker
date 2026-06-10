@@ -1,6 +1,6 @@
-import { useState } from 'react';
-import { getExercises, getHistory, getSettings } from '../services/storage';
-import type { Exercise, LoggedWorkout } from '../types';
+import { useState, useEffect } from 'react';
+import { getExercises, getHistory, getSettings, getWeightHistory, saveWeightLog, deleteWeightLog } from '../services/storage';
+import type { Exercise, LoggedWorkout, WeightLog } from '../types';
 
 type MetricType = '1rm' | 'maxWeight' | 'volume' | 'maxReps' | 'sumReps' | 'maxExtraWeight' | 'volumeExtra';
 
@@ -31,6 +31,42 @@ export function WorkoutStats() {
     return defaultEx?.isBodyweight ? 'maxReps' : '1rm';
   });
   const [activePointIdx, setActivePointIdx] = useState<number | null>(null);
+
+  const [weightLogs, setWeightLogs] = useState<WeightLog[]>(() => getWeightHistory());
+  const [activeWeightPointIdx, setActiveWeightPointIdx] = useState<number | null>(null);
+
+  const getTodayDateStr = () => {
+    const d = new Date();
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  const [newWeightDate, setNewWeightDate] = useState<string>(getTodayDateStr());
+  const [newWeightVal, setNewWeightVal] = useState<string>(() => {
+    const logs = getWeightHistory();
+    return logs.length > 0 ? logs[logs.length - 1].weight.toString() : '80';
+  });
+
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingWeight, setEditingWeight] = useState<string>('');
+
+  // Sync weight logs when tab changes
+  useEffect(() => {
+    if (activeTab === 'weight') {
+      setWeightLogs(getWeightHistory());
+    }
+  }, [activeTab]);
+
+  // Sync default input weight with latest log
+  useEffect(() => {
+    if (weightLogs.length > 0) {
+      setNewWeightVal(weightLogs[weightLogs.length - 1].weight.toString());
+    } else {
+      setNewWeightVal('80');
+    }
+  }, [weightLogs]);
 
   const settings = getSettings();
   const selectedExercise = exercises.find((e) => e.id === selectedExerciseId);
@@ -248,8 +284,501 @@ export function WorkoutStats() {
       </div>
 
       {activeTab === 'weight' && (
-        <div className="card text-center" style={{ padding: '48px 16px' }}>
-          <h3>Widok wagi ciała - w przygotowaniu</h3>
+        <div className="flex-column gap-16">
+          {/* Weight Summary Stats */}
+          {(() => {
+            const latestWeight = weightLogs.length > 0 ? weightLogs[weightLogs.length - 1].weight : null;
+            const weights = weightLogs.map((l) => l.weight);
+            const minWeightVal = weights.length > 0 ? Math.min(...weights) : null;
+            const maxWeightVal = weights.length > 0 ? Math.max(...weights) : null;
+
+            const getChangeForDays = (days: number) => {
+              if (weightLogs.length < 2) return 'Brak danych';
+              const latestLog = weightLogs[weightLogs.length - 1];
+              const latestTime = new Date(latestLog.date).getTime();
+              const targetTime = latestTime - days * 24 * 60 * 60 * 1000;
+
+              // Find the closest log to targetTime (excluding latest)
+              let closestLog: WeightLog | null = null;
+              let minDiff = Infinity;
+
+              for (let i = 0; i < weightLogs.length - 1; i++) {
+                const log = weightLogs[i];
+                const logTime = new Date(log.date).getTime();
+                const diff = Math.abs(logTime - targetTime);
+                if (diff < minDiff) {
+                  minDiff = diff;
+                  closestLog = log;
+                }
+              }
+
+              if (!closestLog) return 'Brak danych';
+
+              const actualDiffDays = (latestTime - new Date(closestLog.date).getTime()) / (24 * 60 * 60 * 1000);
+              if (days === 7 && actualDiffDays < 4) return 'Brak danych';
+              if (days === 30 && actualDiffDays < 15) return 'Brak danych';
+
+              const diff = latestLog.weight - closestLog.weight;
+              const sign = diff > 0 ? '+' : '';
+              return `${sign}${diff.toFixed(1)} kg`;
+            };
+
+            const change7d = getChangeForDays(7);
+            const change30d = getChangeForDays(30);
+
+            return (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px' }}>
+                <div className="card text-center" style={{ padding: '12px', gap: '4px' }}>
+                  <span className="text-muted" style={{ fontSize: '11px', textTransform: 'uppercase', fontWeight: 'bold' }}>Aktualna waga</span>
+                  <strong style={{ fontSize: '20px', color: 'var(--accent)' }}>
+                    {latestWeight !== null ? `${latestWeight} kg` : 'Brak danych'}
+                  </strong>
+                </div>
+                <div className="card text-center" style={{ padding: '12px', gap: '4px' }}>
+                  <span className="text-muted" style={{ fontSize: '11px', textTransform: 'uppercase', fontWeight: 'bold' }}>Najniższa / Najwyższa</span>
+                  <strong style={{ fontSize: '15px' }}>
+                    {minWeightVal !== null ? `${minWeightVal} kg` : '-'} / {maxWeightVal !== null ? `${maxWeightVal} kg` : '-'}
+                  </strong>
+                </div>
+                <div className="card text-center" style={{ padding: '12px', gap: '4px' }}>
+                  <span className="text-muted" style={{ fontSize: '11px', textTransform: 'uppercase', fontWeight: 'bold' }}>Zmiana (7 dni)</span>
+                  <strong style={{ fontSize: '16px', color: change7d.startsWith('-') ? 'var(--accent-success)' : change7d.startsWith('+') ? 'var(--accent-danger)' : 'var(--text-secondary)' }}>
+                    {change7d}
+                  </strong>
+                </div>
+                <div className="card text-center" style={{ padding: '12px', gap: '4px' }}>
+                  <span className="text-muted" style={{ fontSize: '11px', textTransform: 'uppercase', fontWeight: 'bold' }}>Zmiana (30 dni)</span>
+                  <strong style={{ fontSize: '16px', color: change30d.startsWith('-') ? 'var(--accent-success)' : change30d.startsWith('+') ? 'var(--accent-danger)' : 'var(--text-secondary)' }}>
+                    {change30d}
+                  </strong>
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* SVG Weight Chart */}
+          {(() => {
+            if (weightLogs.length < 2) {
+              return (
+                <div className="card text-center" style={{ padding: '32px 16px' }}>
+                  <svg
+                    width="48"
+                    height="48"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="var(--text-secondary)"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    style={{ margin: '0 auto 16px auto', opacity: 0.5 }}
+                  >
+                    <line x1="18" y1="20" x2="18" y2="10" />
+                    <line x1="12" y1="20" x2="12" y2="4" />
+                    <line x1="6" y1="20" x2="6" y2="14" />
+                  </svg>
+                  <p className="text-muted">Brak wystarczającej ilości danych do wygenerowania wykresu wagi.</p>
+                </div>
+              );
+            }
+
+            const weights = weightLogs.map((l) => l.weight);
+            let minWeight = Math.min(...weights);
+            let maxWeight = Math.max(...weights);
+
+            if (minWeight === maxWeight) {
+              minWeight = Math.max(0, minWeight - 5);
+              maxWeight = maxWeight + 5;
+            } else {
+              const range = maxWeight - minWeight;
+              minWeight = Math.max(0, minWeight - range * 0.15);
+              maxWeight = maxWeight + range * 0.15;
+            }
+
+            minWeight = Math.floor(minWeight);
+            maxWeight = Math.ceil(maxWeight);
+
+            const wWidth = 500;
+            const wHeight = 260;
+            const wPadding = { top: 30, right: 30, bottom: 50, left: 50 };
+            const wChartWidth = wWidth - wPadding.left - wPadding.right;
+            const wChartHeight = wHeight - wPadding.top - wPadding.bottom;
+
+            const weightPoints = weightLogs.map((log, idx) => {
+              const x = wPadding.left + (weightLogs.length > 1 ? (idx / (weightLogs.length - 1)) * wChartWidth : wChartWidth / 2);
+              const y = wPadding.top + wChartHeight - ((log.weight - minWeight) / (maxWeight - minWeight)) * wChartHeight;
+              const dateObj = new Date(log.date);
+              const dateStr = dateObj.toLocaleDateString('pl-PL', { day: '2-digit', month: '2-digit' });
+              const fullDateStr = dateObj.toLocaleDateString('pl-PL', {
+                weekday: 'long',
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric'
+              });
+              return {
+                x,
+                y,
+                val: log.weight,
+                dateStr,
+                fullDateStr,
+                log
+              };
+            });
+
+            const wLineD = `M ${weightPoints.map((p) => `${p.x} ${p.y}`).join(' L ')}`;
+            const wAreaD = `${wLineD} L ${weightPoints[weightPoints.length - 1].x} ${wPadding.top + wChartHeight} L ${weightPoints[0].x} ${wPadding.top + wChartHeight} Z`;
+
+            const wGridCount = 4;
+            const wGridLines = Array.from({ length: wGridCount }).map((_, idx) => {
+              const val = minWeight + (idx / (wGridCount - 1)) * (maxWeight - minWeight);
+              const y = wPadding.top + wChartHeight - (idx / (wGridCount - 1)) * wChartHeight;
+              return { y, val: val.toFixed(1) };
+            });
+
+            const displayPoint = activeWeightPointIdx !== null && activeWeightPointIdx < weightPoints.length
+              ? weightPoints[activeWeightPointIdx]
+              : weightPoints[weightPoints.length - 1];
+
+            return (
+              <div className="flex-column gap-16">
+                {displayPoint && (
+                  <div
+                    className="card flex-row justify-between align-center"
+                    style={{
+                      borderLeft: '4px solid var(--accent)',
+                      padding: '12px 16px',
+                      background: 'var(--bg-secondary)',
+                    }}
+                  >
+                    <div className="flex-column" style={{ gap: '4px' }}>
+                      <span className="text-muted" style={{ fontSize: '11px', textTransform: 'uppercase', fontWeight: 'bold' }}>
+                        Wpis z {displayPoint.fullDateStr}
+                      </span>
+                      <span style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
+                        Źródło: <strong>{displayPoint.log.source === 'workout' ? 'Trening' : 'Ręczny'}</strong>
+                      </span>
+                    </div>
+                    <div className="text-center">
+                      <span className="text-muted" style={{ fontSize: '11px', textTransform: 'uppercase' }}>
+                        Waga
+                      </span>
+                      <div style={{ fontSize: '20px', fontWeight: '700', color: 'var(--accent)' }}>
+                        {displayPoint.val} kg
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                <div className="card" style={{ padding: '16px 8px 8px 8px' }}>
+                  <div style={{ position: 'relative', width: '100%', overflow: 'hidden' }}>
+                    <svg
+                      width="100%"
+                      height="100%"
+                      viewBox={`0 0 ${wWidth} ${wHeight}`}
+                      style={{ overflow: 'visible', display: 'block' }}
+                    >
+                      <defs>
+                        <linearGradient id="weight-chart-gradient" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="var(--accent)" stopOpacity="0.3" />
+                          <stop offset="100%" stopColor="var(--accent)" stopOpacity="0.0" />
+                        </linearGradient>
+                      </defs>
+
+                      {/* Horizontal Gridlines */}
+                      {wGridLines.map((line, idx) => (
+                        <g key={idx}>
+                          <line
+                            x1={wPadding.left}
+                            y1={line.y}
+                            x2={wWidth - wPadding.right}
+                            y2={line.y}
+                            stroke="var(--border)"
+                            strokeWidth="1"
+                            strokeDasharray="4 4"
+                          />
+                          <text
+                            x={wPadding.left - 10}
+                            y={line.y + 4}
+                            fill="var(--text-secondary)"
+                            fontSize="11"
+                            textAnchor="end"
+                            fontWeight="500"
+                          >
+                            {line.val}
+                          </text>
+                        </g>
+                      ))}
+
+                      {/* Axis lines */}
+                      <line
+                        x1={wPadding.left}
+                        y1={wPadding.top}
+                        x2={wPadding.left}
+                        y2={wPadding.top + wChartHeight}
+                        stroke="var(--border)"
+                        strokeWidth="1"
+                      />
+                      <line
+                        x1={wPadding.left}
+                        y1={wPadding.top + wChartHeight}
+                        x2={wWidth - wPadding.right}
+                        y2={wPadding.top + wChartHeight}
+                        stroke="var(--border)"
+                        strokeWidth="1"
+                      />
+
+                      {/* Chart paths */}
+                      <path d={wAreaD} fill="url(#weight-chart-gradient)" />
+                      <path
+                        d={wLineD}
+                        fill="none"
+                        stroke="var(--accent)"
+                        strokeWidth="3"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+
+                      {/* Interactive Circles */}
+                      {weightPoints.map((p, idx) => {
+                        const isActive =
+                          activeWeightPointIdx === idx || (activeWeightPointIdx === null && idx === weightPoints.length - 1);
+                        return (
+                          <g key={idx}>
+                            <circle
+                              cx={p.x}
+                              cy={p.y}
+                              r="14"
+                              fill="transparent"
+                              style={{ cursor: 'pointer' }}
+                              onClick={() => setActiveWeightPointIdx(idx)}
+                            />
+                            <circle
+                              cx={p.x}
+                              cy={p.y}
+                              r={isActive ? '6' : '4'}
+                              fill={isActive ? 'var(--accent)' : 'var(--bg-primary)'}
+                              stroke="var(--accent)"
+                              strokeWidth="2"
+                              style={{ transition: 'all 0.1s ease', cursor: 'pointer' }}
+                              onClick={() => setActiveWeightPointIdx(idx)}
+                            />
+                            {(() => {
+                              const total = weightPoints.length;
+                              const shouldShow =
+                                total <= 6 ||
+                                idx === 0 ||
+                                idx === total - 1 ||
+                                (total > 6 && total <= 12 && idx % 2 === 0) ||
+                                (total > 12 && idx % Math.floor(total / 4) === 0);
+
+                              if (!shouldShow) return null;
+
+                              return (
+                                <text
+                                  x={p.x}
+                                  y={wPadding.top + wChartHeight + 20}
+                                  fill={isActive ? 'var(--accent)' : 'var(--text-secondary)'}
+                                  fontSize="10"
+                                  fontWeight={isActive ? '600' : 'normal'}
+                                  textAnchor="middle"
+                                >
+                                  {p.dateStr}
+                                </text>
+                              );
+                            })()}
+                          </g>
+                        );
+                      })}
+                    </svg>
+                  </div>
+                  <p className="text-center text-muted" style={{ fontSize: '11px', marginTop: '12px' }}>
+                    Wskazówka: Dotknij punktu na wykresie, aby zobaczyć szczegóły.
+                  </p>
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* Quick Weight Add Form */}
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              const parsedWeight = parseFloat(newWeightVal);
+              if (isNaN(parsedWeight) || parsedWeight <= 0) return;
+
+              const newLog: WeightLog = {
+                id: typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+                  ? crypto.randomUUID()
+                  : 'weight-' + Date.now() + '-' + Math.random().toString(36).substring(2, 9),
+                date: new Date(newWeightDate + 'T12:00:00').toISOString(),
+                weight: parsedWeight,
+                source: 'manual',
+              };
+
+              const updated = saveWeightLog(newLog);
+              setWeightLogs(updated);
+              setNewWeightDate(getTodayDateStr());
+            }}
+            className="card flex-column gap-12"
+          >
+            <h3 style={{ fontSize: '15px' }}>Dodaj pomiar wagi</h3>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+              <div className="form-group">
+                <label className="form-label" htmlFor="new-weight-date">Data</label>
+                <input
+                  id="new-weight-date"
+                  type="date"
+                  className="input-text"
+                  value={newWeightDate}
+                  onChange={(e) => setNewWeightDate(e.target.value)}
+                  required
+                />
+              </div>
+              <div className="form-group">
+                <label className="form-label" htmlFor="new-weight-val">Waga (kg)</label>
+                <input
+                  id="new-weight-val"
+                  type="number"
+                  step="0.1"
+                  className="input-text"
+                  value={newWeightVal}
+                  onChange={(e) => setNewWeightVal(e.target.value)}
+                  required
+                />
+              </div>
+            </div>
+            <button type="submit" className="btn btn-primary btn-full">
+              + Dodaj wagę
+            </button>
+          </form>
+
+          {/* Weight History List */}
+          <div className="card flex-column gap-12">
+            <h3 style={{ fontSize: '15px' }}>Historia pomiarów</h3>
+            {weightLogs.length === 0 ? (
+              <p className="text-center text-muted" style={{ padding: '16px 0' }}>Brak pomiarów w bazie.</p>
+            ) : (
+              <div className="flex-column" style={{ gap: '8px' }}>
+                {[...weightLogs].reverse().map((log) => {
+                  const isEditing = editingId === log.id;
+                  const formattedDate = new Date(log.date).toLocaleDateString('pl-PL', {
+                    day: '2-digit',
+                    month: '2-digit',
+                    year: 'numeric',
+                  });
+
+                  // Display workout source name if available
+                  let sourceText = 'Ręczny';
+                  if (log.source === 'workout') {
+                    const matchedWorkout = history.find((w) => w.id === log.workoutId);
+                    sourceText = matchedWorkout ? matchedWorkout.name : 'Trening';
+                  }
+
+                  const badgeStyle = {
+                    fontSize: '11px',
+                    fontWeight: '600' as const,
+                    padding: '2px 8px',
+                    borderRadius: '4px',
+                    color: log.source === 'workout' ? 'var(--accent)' : 'var(--text-secondary)',
+                    background: log.source === 'workout' ? 'rgba(0, 210, 255, 0.1)' : 'rgba(255, 255, 255, 0.05)',
+                  };
+
+                  return (
+                    <div
+                      key={log.id}
+                      className="flex-row justify-between align-center"
+                      style={{
+                        padding: '10px 12px',
+                        border: '1px solid var(--border)',
+                        borderRadius: '8px',
+                        backgroundColor: 'var(--bg-surface)',
+                      }}
+                    >
+                      <div className="flex-column" style={{ gap: '4px' }}>
+                        <span style={{ fontSize: '13px', fontWeight: '500' }}>{formattedDate}</span>
+                        <div className="flex-row" style={{ gap: '6px' }}>
+                          <span style={badgeStyle}>{sourceText}</span>
+                        </div>
+                      </div>
+
+                      <div className="flex-row align-center" style={{ gap: '12px' }}>
+                        {isEditing ? (
+                          <>
+                            <input
+                              type="number"
+                              step="0.1"
+                              className="input-text"
+                              style={{ width: '80px', padding: '4px 8px', fontSize: '14px', textAlign: 'center' }}
+                              value={editingWeight}
+                              onChange={(e) => setEditingWeight(e.target.value)}
+                              autoFocus
+                            />
+                            <div className="flex-row" style={{ gap: '4px' }}>
+                              <button
+                                type="button"
+                                className="btn btn-success btn-sm"
+                                onClick={() => {
+                                  const parsed = parseFloat(editingWeight);
+                                  if (isNaN(parsed) || parsed <= 0) return;
+                                  const updatedLog = { ...log, weight: parsed };
+                                  const updated = saveWeightLog(updatedLog);
+                                  setWeightLogs(updated);
+                                  setEditingId(null);
+                                }}
+                                style={{ padding: '6px 10px' }}
+                              >
+                                Zapisz
+                              </button>
+                              <button
+                                type="button"
+                                className="btn btn-secondary btn-sm"
+                                onClick={() => setEditingId(null)}
+                                style={{ padding: '6px 10px' }}
+                              >
+                                Anuluj
+                              </button>
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            <span style={{ fontSize: '16px', fontWeight: '700', color: 'var(--accent)' }}>
+                              {log.weight} kg
+                            </span>
+                            <div className="flex-row" style={{ gap: '4px' }}>
+                              <button
+                                type="button"
+                                className="btn btn-secondary btn-sm"
+                                onClick={() => {
+                                  setEditingId(log.id);
+                                  setEditingWeight(log.weight.toString());
+                                }}
+                                style={{ padding: '6px 10px' }}
+                              >
+                                Edytuj
+                              </button>
+                              <button
+                                type="button"
+                                className="btn btn-danger btn-sm"
+                                onClick={() => {
+                                  if (window.confirm('Czy na pewno chcesz usunąć ten wpis wagi?')) {
+                                    const updated = deleteWeightLog(log.id);
+                                    setWeightLogs(updated);
+                                    setActiveWeightPointIdx(null);
+                                  }
+                                }}
+                                style={{ padding: '6px 10px' }}
+                              >
+                                Usuń
+                              </button>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </div>
       )}
 

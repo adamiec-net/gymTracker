@@ -16,7 +16,7 @@
   - **Cel**: Stworzyć zakładkę "Ćwiczenia". Dla ćwiczeń kalistenicznych wykluczyć wagę użytkownika z obciążeń i dodać metryki: Maks. powtórzenia, Suma powtórzeń, Maks. dodatkowy ciężar, Objętość dodatkowa. Dla pozostałych ćwiczeń wyświetlić: 1RM, Maks. ciężar, Objętość, Maks. powtórzenia.
   - **Warunek ukończenia**: Wykres SVG poprawnie reaguje na wybrane ćwiczenie kalisteniczne i standardowe oraz wybrane metryki.
 
-- `[ ]` **Zadanie 5: Dedykowane śledzenie wagi ciała (`WorkoutStats.tsx` - Zakładka 2)**
+- [x] **Zadanie 5: Dedykowane śledzenie wagi ciała (`WorkoutStats.tsx` - Zakładka 2)**
   - **Cel**: Stworzyć zakładkę "Waga Ciała" zawierającą wykres wagi w czasie, podsumowanie zmian (7 dni, 30 dni, min, max), szybkie dodawanie wagi oraz lista wpisów z możliwością edycji i usuwania.
   - **Warunek ukończenia**: Wykres wagi ciała rysuje się prawidłowo, dodawanie i usuwanie wpisów wagi odświeża wykres i listę w czasie rzeczywistym.
 
