@@ -1,122 +1,76 @@
 # Walkthrough - Gym Tracker PWA
 
-A complete Progressive Web App (PWA) gym tracker built using **React + Vite + TypeScript + Vanilla CSS**, designed with a premium modern minimalist dark theme. The application runs entirely in the browser, stores data in `localStorage`, operates offline via a service worker, and is installable on Android/iOS/Desktop devices.
+Kompletna progresywna aplikacja internetowa (PWA) do śledzenia treningów siłowych zbudowana przy użyciu **React + Vite + TypeScript + Vanilla CSS**, zaprojektowana w nowoczesnym, ciemnym motywie minimalistycznym premium. Aplikacja działa w 100% w przeglądarce, przechowuje dane w `localStorage`, działa w pełni offline dzięki Service Workerowi i jest możliwa do zainstalowania na urządzeniach mobilnych oraz desktopowych.
 
 ---
 
 ## Technical Stack & Architecture
 
 - **Frontend Core**: React 18, Vite 8, TypeScript.
-- **Styling**: Vanilla CSS (`src/index.css`) utilizing modern CSS variables for semantic theme styling, transition effects, checkmark animation keyframes, and full screen mobile boundaries (using `100dvh` to handle mobile browser toolbars).
-- **PWA Capabilities**:
-  - Web App Manifest: `public/manifest.json` provides application configuration, theme styling, and application icons.
-  - Service Worker: `public/sw.js` caches static resources on install and handles fetch requests using a **stale-while-revalidate** strategy for fast page loads and full offline capability.
-  - Offline Audio: `src/components/RestTimer.tsx` uses the **Web Audio API** to synthesize double-beep sounds, eliminating the need to load or request external audio files while offline.
-- **Database/Storage**: `src/services/storage.ts` manages persistence in `localStorage`, preloads default exercises, handles templates, history logs, JSON backup downloads, and schema-validated JSON uploads.
+- **Styling**: Vanilla CSS (`src/index.css`) wykorzystujący zmienne CSS do tworzenia motywu ciemnego, płynnych przejść i animacji mikrointerakcji.
+- **PWA Capabilities**: Standalone manifest (`public/manifest.json`), Service Worker (`public/sw.js`) z cache stale-while-revalidate oraz w pełni offline'owy licznik odpoczynku generujący dźwięki za pomocą **Web Audio API** (bez pobierania zewnętrznych plików audio).
+- **Database/Storage**: `src/services/storage.ts` zarządzający lokalnym stanem w `localStorage`, importem/eksportem kopii zapasowych JSON oraz ujednoliconą bazą ćwiczeń.
 
 ---
 
-## Key Features Implemented (Advanced Module)
+## Key Features Implemented (Advanced Module & Stats Refactoring)
 
-We have successfully integrated a comprehensive body weight tracking module, historical workout editing, calisthenics performance adjustments, and correlation analysis:
+Wprowadziliśmy znaczące uproszczenie logiki ćwiczeń oraz przeprowadziliśmy pełną rewolucję w module statystyk i analizy wagi ciała użytkownika:
 
-### 1. Data Schema & Persistence Enhancements
-- **New Types**: Added `WeightLog` model in [src/types.ts](file:///c:/source/gymTracker/src/types.ts). Extended `BackupData` to support weight history.
-- **Bi-directional Sync**: Implemented `syncWeightFromWorkout` in [src/services/storage.ts](file:///c:/source/gymTracker/src/services/storage.ts). Saving a workout with a body weight value automatically creates or updates a corresponding weight log.
-- **Propagation Logic**: Modifying or deleting a weight log automatically propagates to the linked workout in history, and deleting a workout automatically cleans up its corresponding weight log.
-- **Backup Integrity**: Extended `importData` and `exportData` to handle weight logs seamlessly, ensuring backward compatibility with older backup formats.
+### 1. Uproszczenie Ćwiczeń (Usunięcie flagi własnej masy ciała)
+- **Usunięcie podziału**: Całkowicie wyeliminowaliśmy flagę `isBodyweight` z definicji ćwiczeń. Wszystkie ćwiczenia są teraz traktowane w ten sam zunifikowany sposób. Użytkownik loguje bezpośrednio ciężar wpisany na treningu.
+- **Aktualizacja Atlasu**: W komponencie [ExerciseLibrary.tsx](file:///c:/source/gymTracker/src/components/ExerciseLibrary.tsx) usunięto checkbox „Ćwiczenie z ciężarem własnego ciała”, stan `newIsBodyweight` oraz ikonkę `👤` na liście ćwiczeń.
+- **Domyślna baza**: Wyczyszczono właściwość `isBodyweight` w domyślnie predefiniowanych ćwiczeniach w [storage.ts](file:///c:/source/gymTracker/src/services/storage.ts).
 
-### 2. Historical Workout Editing Modal
-- **Interactive Controls**: Added a direct "Edytuj" (Edit) button on each card within the [WorkoutHistory.tsx](file:///c:/source/gymTracker/src/components/WorkoutHistory.tsx) tab.
-- **EditWorkoutModal**: Opens a premium dark overlay modal allowing users to:
-  - Modify workout title, start/end date-times (using timezone-safe helpers).
-  - Adjust user body weight logged for the session.
-  - Edit reps, weight, and completion state for individual sets.
-  - Delete individual sets or add new ones.
-  - Add completely new exercises to the historical log, or delete existing ones.
-  - Commit updates cleanly via `saveWorkout` with automated state refreshing.
+### 2. Zintegrowane Wykresy i Statystyki z Korelacją Wagi Ciała
+Zastąpiliśmy stary system statystyk i korelacji (złożony z 3 osobnych zakładek) jednym prostym i eleganckim widokiem w [WorkoutStats.tsx](file:///c:/source/gymTracker/src/components/WorkoutStats.tsx):
+- **Brak zakładek**: Użytkownik wybiera z dropdownu dowolne ćwiczenie z biblioteki i od razu ma dostęp do pełnych statystyk.
+- **Dwa połączone widoki wykresów**:
+  1. **Maks. Ciężar + Maks. Powtórzenia**: Dwuosiowy wykres pokazujący na jednym polu maksymalny podniesiony ciężar (lewa oś Y) oraz maksymalną liczbę powtórzeń w serii (prawy trend, znormalizowany), z nałożoną linią wagi ciała użytkownika (prawa oś Y) w celu natychmiastowej oceny korelacji.
+  2. **Suma Powtórzeń + Objętość**: Wykres pokazujący trend objętości treningowej (lewa oś Y) oraz sumy powtórzeń (prawy trend, znormalizowany), z nałożoną linią wagi ciała użytkownika (prawa oś Y).
+- **Zintegrowany panel szczegółów**: Kliknięcie dowolnego punktu na wykresie wyświetla kompletne informacje z danej sesji treningowej (Data, waga ciała w tej sesji oraz odpowiednie dwie metryki ćwiczenia).
+- **Rekordy i Osiągnięcia**: Zunifikowane podsumowanie osiągnięć pod wykresem wyświetlające: Całkowitą liczbę sesji, Rekordowy ciężar (Max), Najlepszy szacowany 1RM (wzór Epleya), Maks. powtórzenia w serii oraz Sumę wszystkich powtórzeń.
+- **Dynamiczny Trener Korelacji**: Pod wykresem wyświetla się automatycznie generowana analiza trendu w języku polskim, porównująca zmiany wagi ciała ze zmianami siły/objętości pomiędzy pierwszym a ostatnim treningiem.
 
-### 3. Differentiated Exercise Statistics
-- **Restructured Tab View**: Rebuilt [WorkoutStats.tsx](file:///c:/source/gymTracker/src/components/WorkoutStats.tsx) to support a 3-tab layout (*Ćwiczenia*, *Waga Ciała*, *Korelacja*).
-- **Calisthenics Separation**:
-  - For standard exercises: calculates and plots **Estimated 1RM** (Epley formula), **Max Weight**, **Total Volume**, and **Max Reps**.
-  - For calisthenic exercises (`isBodyweight: true`): body weight is **excluded** from loads. Tracks bodyweight-specific metrics: **Max Reps in Set**, **Sum of Reps**, **Max Additional Weight**, and **Volume (Additional Weight only)**.
-  - Hides the body weight line on the SVG chart for calisthenics exercises to avoid chart clutter.
-
-### 4. Dedicated Body Weight Module
-- **SVG Weight Trend Chart**: Plots body weight history chronologically with visual gradients, interactive coordinate points, and mobile-friendly touch targets.
-- **Summary Metrics**: Calculates current weight, highest/lowest logs, and weight change differences over the last **7 days** and **30 days** using date-range math.
-- **Quick Logging**: An easy-to-use logging form to input body weight on any date.
-- **Weight Log Manager**: List of all weight logs (descending) supporting instant delete (with confirmation) and **inline editing** using local state toggles.
-
-### 5. Dual-Axis Weight Correlation Analysis
-- **Filtering**: Filters dropdown selections to show only calisthenics/bodyweight movements.
-- **Dual Y-Axes**: Plots calisthenics performance (solid primary line, left Y-axis in reps or additional kg) against user body weight (dashed secondary line, right Y-axis in kg) on the same timeline.
-- **Dynamic Motivational Coach**: Analyzes progress between the first and last sessions. Automatically writes a tailored motivational paragraph in Polish (evaluating weight loss/gain vs strength loss/gain) explaining how weight trends impact relative performance.
+### 3. Moduł Zarządzania Wagą Ciała Przeniesiony do Ustawień
+Aby odciążyć widok statystyk, całe zarządzanie historią wagi ciała zostało przeniesione do [Settings.tsx](file:///c:/source/gymTracker/src/components/Settings.tsx):
+- **Wykres Trendu Wagi**: Czysty chronologiczny wykres SVG prezentujący wagę użytkownika na przestrzeni czasu z interaktywnymi punktami.
+- **Statystyki Zmian**: Karty pokazujące aktualną wagę, najniższą/najwyższą oraz wyliczone różnice wagi z ostatnich **7 dni** oraz **30 dni**.
+- **Logowanie Wagi**: Szybki formularz do ręcznego dodawania pomiarów wagi na wybraną datę.
+- **Lista Historyczna**: Pełna lista pomiarów wagi ciała (posortowana malejąco) ze wskaźnikami źródła (wpis ręczny / wpis z treningu) oraz możliwością **usuwania** i **szybkiej edycji inline**.
 
 ---
 
 ## File Directory Structure
 
-Below is a breakdown of the key files implemented across the project:
-
-### Configuration & PWA Assets
-- [package.json](file:///c:/source/gymTracker/package.json): Set up React, TypeScript, and Vite scripts.
-- [vite.config.ts](file:///c:/source/gymTracker/vite.config.ts): Configured React plugin and static asset building.
-- [index.html](file:///c:/source/gymTracker/index.html): Custom viewport configuration, mobile meta tags, meta links, and application icon headers.
-- [public/manifest.json](file:///c:/source/gymTracker/public/manifest.json): Configuration for standalone app mode, startup parameters, theme colors, and SVG icon declarations.
-- [public/sw.js](file:///c:/source/gymTracker/public/sw.js): Serves cached assets offline, updating them in the background.
-- [src/registerServiceWorker.ts](file:///c:/source/gymTracker/src/registerServiceWorker.ts): Handles SW registration on browser boot.
-
-### Core Logic & State Management
-- [src/types.ts](file:///c:/source/gymTracker/src/types.ts): Data structure declarations for exercises, sets, workouts, PWA events, and `WeightLog`.
-- [src/services/storage.ts](file:///c:/source/gymTracker/src/services/storage.ts): CRUD operations, backup JSON imports, and two-way workout-weight sync.
-- [src/main.tsx](file:///c:/source/gymTracker/src/main.tsx): Root mount logic that listens for the PWA install event.
-- [src/App.tsx](file:///c:/source/gymTracker/src/App.tsx): Coordinates tabs, displays the navigation menu, and coordinates the active workout tracking.
-
-### Design System & Layout
-- [src/index.css](file:///c:/source/gymTracker/src/index.css): Implements custom dark themes (`#121212` primary background, `#00d2ff` electric cyan accent), responsive layout blocks, and checklist animations.
-
-### Views & Components (`src/components/`)
-- [Navigation.tsx](file:///c:/source/gymTracker/src/components/Navigation.tsx): Bottom navigation bar using premium inline SVG icons.
-- [WorkoutSchedule.tsx](file:///c:/source/gymTracker/src/components/WorkoutSchedule.tsx): 7-day calendar, starts scheduled workouts.
-- [WorkoutTemplates.tsx](file:///c:/source/gymTracker/src/components/WorkoutTemplates.tsx): Creates, edits, and deletes workout templates.
-- [ExerciseLibrary.tsx](file:///c:/source/gymTracker/src/components/ExerciseLibrary.tsx): Atlas listing default and custom exercises.
-- [WorkoutActive.tsx](file:///c:/source/gymTracker/src/components/WorkoutActive.tsx): Active tracker interface, checking sets triggers rest timer.
-- [RestTimer.tsx](file:///c:/source/gymTracker/src/components/RestTimer.tsx): Circle countdown widget with Web Audio double-beep.
-- [WorkoutHistory.tsx](file:///c:/source/gymTracker/src/components/WorkoutHistory.tsx): Chronological completed workouts logs featuring the Edit Workout Modal.
-- [WorkoutStats.tsx](file:///c:/source/gymTracker/src/components/WorkoutStats.tsx): Interactive SVG charts for exercise metrics, weight logging, and dual-axis calisthenics-weight correlations.
-- [Settings.tsx](file:///c:/source/gymTracker/src/components/Settings.tsx): Handles backup exports/imports, system resets, and PWA installs.
+- [src/types.ts](file:///c:/source/gymTracker/src/types.ts): Definicje typów danych, w tym opcjonalne pole `isBodyweight` w `Exercise`.
+- [src/services/storage.ts](file:///c:/source/gymTracker/src/services/storage.ts): Logika zapisu w `localStorage`, import/eksport danych, resetowanie bazy oraz zaktualizowana domyślna lista ćwiczeń.
+- [src/components/ExerciseLibrary.tsx](file:///c:/source/gymTracker/src/components/ExerciseLibrary.tsx): Atlas ćwiczeń pozbawiony checkboxa oraz wskaźników masy ciała.
+- [src/components/Settings.tsx](file:///c:/source/gymTracker/src/components/Settings.tsx): Ustawienia aplikacji rozszerzone o kompletny moduł wagi ciała (wykres, podsumowania, formularz, edytowalna lista).
+- [src/components/WorkoutStats.tsx](file:///c:/source/gymTracker/src/components/WorkoutStats.tsx): Nowy uproszczony i zintegrowany widok dwuosiowych statystyk i korelacji.
 
 ---
 
 ## Verification Results
 
-### Quality Assurance & Validation Tests
-1. **Compilation**: `npx tsc --noEmit` and `npm run build` execute successfully.
-2. **Type Safety**: TypeScript compiler completes with **0 errors**.
-3. **Data Integrity**: Lazy state loading (`useState(() => get...)`) ensures there are no race conditions or component side-effects.
+1. **Kompakcja i Typowanie**: Projekt buduje się w 100% poprawnie poleceniem `npm run build`. Kompilator TypeScript nie zgłasza żadnych błędów ani ostrzeżeń.
+2. **Import i Eksport**: Przetestowano integralność eksportu i importu danych JSON (zarówno z nowymi danymi wagi, jak i starszymi kopiami zapasowymi).
+3. **Funkcjonalność Wykresów**: Sprawdzono, czy wykresy SVG renderują się prawidłowo zarówno przy 1 sesji treningowej (wyświetlanie punktu centralnego), jak i przy wielu sesjach (renderowanie linii i obszarów).
 
 ---
 
 ## How to Run the App
 
-1. Install dependencies (if not already done):
+1. Zainstaluj zależności:
    ```bash
    npm install
    ```
-2. Start the local Vite development server:
+2. Uruchom serwer deweloperski Vite:
    ```bash
    npm run dev
    ```
-3. Open your browser and navigate to the printed URL (typically `http://localhost:5173`).
-4. To test PWA features locally:
-   - Run a production build:
-     ```bash
-     npm run build
-     ```
-   - Serve the build locally:
-     ```bash
-     npm run preview
-     ```
-   - Inspect the application in Google Chrome DevTools (Application tab) to review the **Service Worker** and **Manifest**.
+3. Zbuduj wersję produkcyjną i uruchom lokalny podgląd (do testów PWA):
+   ```bash
+   npm run build
+   npm run preview
+   ```
