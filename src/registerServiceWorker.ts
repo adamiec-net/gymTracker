@@ -1,6 +1,6 @@
 export function register() {
   if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
+    const registerSW = () => {
       let base = import.meta.env.BASE_URL;
       if (base === './') {
         const path = window.location.pathname;
@@ -23,6 +23,12 @@ export function register() {
         .catch((error) => {
           console.error('Service Worker registration failed:', error);
         });
-    });
+    };
+
+    if (document.readyState === 'complete') {
+      registerSW();
+    } else {
+      window.addEventListener('load', registerSW);
+    }
   }
 }
