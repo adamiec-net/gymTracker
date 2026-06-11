@@ -1,10 +1,10 @@
 const CACHE_NAME = 'gym-tracker-v1';
 const ASSETS_TO_CACHE = [
-  '/',
-  '/index.html',
-  '/favicon.svg',
-  '/icon.svg',
-  '/manifest.json'
+  './',
+  './index.html',
+  './favicon.svg',
+  './icon.svg',
+  './manifest.json'
 ];
 
 self.addEventListener('install', (event) => {
@@ -69,7 +69,7 @@ self.addEventListener('fetch', (event) => {
         .catch((err) => {
           // If offline and request is a page navigation, serve index.html
           if (event.request.mode === 'navigate') {
-            return caches.match('/index.html');
+            return caches.match('./index.html');
           }
           throw err;
         });
