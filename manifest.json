@@ -38,7 +38,9 @@
       "purpose": "maskable"
     }
   ],
-  "start_url": "./",
+  "id": "/gymTracker/",
+  "scope": "./",
+  "start_url": "./index.html",
   "background_color": "#121212",
   "theme_color": "#121212",
   "display": "standalone",
