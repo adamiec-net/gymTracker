@@ -15,42 +15,7 @@ export function WorkoutHistory() {
   const [workoutExercises, setWorkoutExercises] = useState<WorkoutExercise[]>([]);
   const [selectedExerciseId, setSelectedExerciseId] = useState('');
 
-  // Heatmap logic
-  const WEEKS = 16;
-  const DAYS = WEEKS * 7;
-  
-  const activityMap = new Map<string, boolean>();
-  history.forEach(w => {
-    const d = new Date(w.startTime);
-    if (!isNaN(d.getTime())) {
-      const dateKey = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-      activityMap.set(dateKey, true);
-    }
-  });
 
-  const today = new Date();
-  today.setHours(0,0,0,0);
-  
-  const heatmapDays = [];
-  for (let i = DAYS - 1; i >= 0; i--) {
-    const d = new Date(today);
-    d.setDate(today.getDate() - i);
-    const dateKey = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-    heatmapDays.push({
-      dateKey,
-      active: activityMap.has(dateKey),
-      date: d
-    });
-  }
-
-  let currentStreak = 0;
-  for (let i = DAYS - 1; i >= 0; i--) {
-    if (heatmapDays[i].active) {
-      currentStreak++;
-    } else if (i !== DAYS - 1) {
-      break;
-    }
-  }
 
   const toLocalDatetimeString = (isoString: string): string => {
     if (!isoString) return '';
@@ -253,26 +218,7 @@ export function WorkoutHistory() {
         </div>
       </div>
 
-      {/* Heatmap Section */}
-      <div className="card flex-column gap-8" style={{ padding: '16px' }}>
-        <div className="flex-row justify-between align-center">
-          <h3 style={{ fontSize: '14px', margin: 0 }}>Aktywność ({WEEKS} tyg.)</h3>
-          <span style={{ fontSize: '12px', fontWeight: '600', color: 'var(--accent)' }}>
-            Ciąg treningowy: {currentStreak} {currentStreak === 1 ? 'dzień' : 'dni'}
-          </span>
-        </div>
-        <div className="heatmap-scroll-container">
-          <div className="heatmap-grid">
-            {heatmapDays.map((day) => (
-              <div
-                key={day.dateKey}
-                className={`heatmap-cell ${day.active ? 'active' : ''}`}
-                title={`${day.date.toLocaleDateString('pl-PL')} ${day.active ? '(Trening zaliczony)' : '(Brak treningu)'}`}
-              />
-            ))}
-          </div>
-        </div>
-      </div>
+
 
 
       {history.length === 0 ? (

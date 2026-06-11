@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { getExercises, getHistory, getWeightHistory } from '../services/storage';
-import type { Exercise, LoggedWorkout, WeightLog } from '../types';
+import { getExercises, getHistory, getWeightHistory, getSettings } from '../services/storage';
+import type { Exercise, LoggedWorkout, WeightLog, AppSettings } from '../types';
 
 type ChartViewType = 'maxWeight_maxReps' | 'sumReps_volume';
 
@@ -104,6 +104,285 @@ export function WorkoutStats() {
   const padding = { top: 30, right: 50, bottom: 50, left: 50 };
   const chartWidth = width - padding.left - padding.right;
   const chartHeight = height - padding.top - padding.bottom;
+
+  // Heatmap & Weekly Correlation logic
+  const settings = getSettings();
+  const WEEKS_COUNT = 16;
+  const DAYS_COUNT = WEEKS_COUNT * 7;
+
+  // Helper to find Monday of a given date
+  const getMondayOfDate = (d: Date): Date => {
+    const date = new Date(d);
+    const day = date.getDay();
+    const diff = date.getDate() - day + (day === 0 ? -6 : 1); // adjust when day is Sunday
+    date.setDate(diff);
+    date.setHours(0, 0, 0, 0);
+    return date;
+  };
+
+  // 1. Calculate Daily Heatmap
+  const activityMap = new Map<string, boolean>();
+  history.forEach((w) => {
+    const d = new Date(w.startTime);
+    if (!isNaN(d.getTime())) {
+      const dateKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      activityMap.set(dateKey, true);
+    }
+  });
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const heatmapDays = [];
+  for (let i = DAYS_COUNT - 1; i >= 0; i--) {
+    const d = new Date(today);
+    d.setDate(today.getDate() - i);
+    const dateKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    heatmapDays.push({
+      dateKey,
+      active: activityMap.has(dateKey),
+      date: d,
+    });
+  }
+
+  // 2. Calculate Weekly Streak
+  const getWeeklyStreak = (hist: LoggedWorkout[]): number => {
+    if (hist.length === 0) return 0;
+
+    const activeMondays = new Set<string>();
+    hist.forEach((w) => {
+      const d = new Date(w.startTime);
+      if (!isNaN(d.getTime())) {
+        const mon = getMondayOfDate(d);
+        const key = mon.toISOString().split('T')[0];
+        activeMondays.add(key);
+      }
+    });
+
+    const todayMon = getMondayOfDate(new Date());
+    const todayMonKey = todayMon.toISOString().split('T')[0];
+
+    const prevMon = new Date(todayMon);
+    prevMon.setDate(todayMon.getDate() - 7);
+    const prevMonKey = prevMon.toISOString().split('T')[0];
+
+    const isPrevActive = activeMondays.has(prevMonKey);
+    const isTodayActive = activeMondays.has(todayMonKey);
+
+    if (!isPrevActive) {
+      return isTodayActive ? 1 : 0;
+    }
+
+    let streak = 0;
+    const currentCheck = new Date(prevMon);
+    while (true) {
+      const key = currentCheck.toISOString().split('T')[0];
+      if (activeMondays.has(key)) {
+        streak++;
+        currentCheck.setDate(currentCheck.getDate() - 7);
+      } else {
+        break;
+      }
+    }
+
+    if (isTodayActive) {
+      streak += 1;
+    }
+
+    return streak;
+  };
+
+  const formatWeeksPolish = (n: number): string => {
+    if (n === 1) return '1 tydzień';
+    const lastDigit = n % 10;
+    const lastTwoDigits = n % 100;
+    if (lastDigit >= 2 && lastDigit <= 4 && (lastTwoDigits < 10 || lastTwoDigits >= 20)) {
+      return `${n} tygodnie`;
+    }
+    return `${n} tygodni`;
+  };
+
+  const weeklyStreak = getWeeklyStreak(history);
+  const weeklyStreakText = formatWeeksPolish(weeklyStreak);
+
+  // Helper to resolve weight for a given week
+  const getWeightForWeek = (start: Date, end: Date, wLogs: WeightLog[], opts: AppSettings): number | undefined => {
+    const logsInWeek = wLogs.filter((l) => {
+      const t = new Date(l.date).getTime();
+      return t >= start.getTime() && t <= end.getTime();
+    });
+    if (logsInWeek.length > 0) {
+      const sum = logsInWeek.reduce((acc, l) => acc + l.weight, 0);
+      return parseFloat((sum / logsInWeek.length).toFixed(1));
+    }
+    const pastLogs = wLogs.filter((l) => new Date(l.date).getTime() < start.getTime());
+    if (pastLogs.length > 0) {
+      return pastLogs[pastLogs.length - 1].weight;
+    }
+    const futureLogs = wLogs.filter((l) => new Date(l.date).getTime() > end.getTime());
+    if (futureLogs.length > 0) {
+      return futureLogs[0].weight;
+    }
+    return opts.userWeight;
+  };
+
+  // 3. Generate 16 weeks data for correlation chart
+  const currentMonday = getMondayOfDate(new Date());
+  const weeksList = [];
+  for (let i = 15; i >= 0; i--) {
+    const start = new Date(currentMonday);
+    start.setDate(currentMonday.getDate() - i * 7);
+    const end = new Date(start);
+    end.setDate(start.getDate() + 6);
+    end.setHours(23, 59, 59, 999);
+    weeksList.push({ start, end });
+  }
+
+  const weeklyCorrelationData = weeksList.map((week, idx) => {
+    const workoutsInWeek = history.filter((w) => {
+      const t = new Date(w.startTime).getTime();
+      return t >= week.start.getTime() && t <= week.end.getTime();
+    });
+
+    const wWeight = getWeightForWeek(week.start, week.end, weightLogs, settings);
+
+    // Sum reps * weight for all completed sets in all workouts of this week
+    let totalRepsWeightSum = 0;
+    const workoutCount = workoutsInWeek.length;
+
+    workoutsInWeek.forEach((w) => {
+      w.exercises.forEach((ex) => {
+        const completedSets = ex.sets.filter((s) => s.completed);
+        const targetSets = completedSets.length > 0 ? completedSets : ex.sets;
+        
+        targetSets.forEach((set) => {
+          if (set.weight > 0) {
+            totalRepsWeightSum += set.reps * set.weight;
+          } else {
+            // zero weight represents a bodyweight exercise -> use current workout/week bodyWeight or settings
+            const currentWorkoutBw = w.bodyWeight || wWeight || settings.userWeight || 0;
+            totalRepsWeightSum += set.reps * currentWorkoutBw;
+          }
+        });
+      });
+    });
+
+    const strengthLevel = workoutCount > 0 ? parseFloat((totalRepsWeightSum / workoutCount).toFixed(1)) : 0;
+    const startLabel = week.start.toLocaleDateString('pl-PL', { day: '2-digit', month: '2-digit' });
+
+    return {
+      weekIndex: idx,
+      start: week.start,
+      end: week.end,
+      strengthLevel,
+      bodyWeight: wWeight,
+      label: startLabel,
+      workoutCount,
+    };
+  });
+
+  // Calculate 16-week average strength level for active weeks
+  const activeWeeks = weeklyCorrelationData.filter((wd) => wd.workoutCount > 0);
+  const avgStrength16 = activeWeeks.length > 0
+    ? activeWeeks.reduce((sum, wd) => sum + wd.strengthLevel, 0) / activeWeeks.length
+    : 0;
+
+  // Comparison Text
+  const latestActiveWeek = [...weeklyCorrelationData].reverse().find((wd) => wd.workoutCount > 0);
+  let weeklyComparisonText = '';
+  if (latestActiveWeek && avgStrength16 > 0) {
+    const diffPercent = ((latestActiveWeek.strengthLevel - avgStrength16) / avgStrength16) * 100;
+    const isCurrentWeek = latestActiveWeek.weekIndex === 15;
+    const weekLabel = isCurrentWeek ? 'w tym tygodniu' : `w tygodniu od ${latestActiveWeek.start.toLocaleDateString('pl-PL')}`;
+    const sign = diffPercent >= 0 ? '+' : '';
+    weeklyComparisonText = `Średnia waga treningu ${weekLabel} (${latestActiveWeek.strengthLevel.toFixed(1)} kg) była o ${sign}${diffPercent.toFixed(1)}% ${diffPercent >= 0 ? 'wyższa' : 'niższa'} niż średnia z całego okresu 16 tygodni (${avgStrength16.toFixed(1)} kg).`;
+  }
+
+  // Weekly Chart state and calculations
+  const [activeWeeklyPointIdx, setActiveWeeklyPointIdx] = useState<number | null>(null);
+
+  const strengthValues = weeklyCorrelationData.map((d) => d.strengthLevel);
+  const maxStrength = Math.max(...strengthValues);
+  const minStrengthY = 0;
+  const maxStrengthY = maxStrength > 0 ? Math.ceil(maxStrength * 1.15) : 1000;
+
+  const weeklyWeightValues = weeklyCorrelationData
+    .map((d) => d.bodyWeight)
+    .filter((w): w is number => w !== undefined && w !== null && w > 0);
+  
+  const hasWeeklyWeightData = weeklyWeightValues.length > 0;
+  let minWeeklyWeightY = 0;
+  let maxWeeklyWeightY = 0;
+  if (hasWeeklyWeightData) {
+    const minW = Math.min(...weeklyWeightValues);
+    const maxW = Math.max(...weeklyWeightValues);
+    if (minW === maxW) {
+      minWeeklyWeightY = Math.max(0, minW - 5);
+      maxWeeklyWeightY = minW + 5;
+    } else {
+      const range = maxW - minW;
+      minWeeklyWeightY = Math.max(0, minW - range * 0.2);
+      maxWeeklyWeightY = maxW + range * 0.2;
+    }
+    minWeeklyWeightY = Math.floor(minWeeklyWeightY);
+    maxWeeklyWeightY = Math.ceil(maxWeeklyWeightY);
+  }
+
+  const weeklyPoints = weeklyCorrelationData.map((d, i) => {
+    const x = padding.left + (i / 15) * chartWidth;
+    const yLeft = padding.top + chartHeight - ((d.strengthLevel - minStrengthY) / (maxStrengthY - minStrengthY)) * chartHeight;
+    const yRight = (hasWeeklyWeightData && d.bodyWeight !== undefined && d.bodyWeight !== null && minWeeklyWeightY !== maxWeeklyWeightY)
+      ? padding.top + chartHeight - ((d.bodyWeight - minWeeklyWeightY) / (maxWeeklyWeightY - minWeeklyWeightY)) * chartHeight
+      : undefined;
+
+    return {
+      x,
+      yLeft,
+      yRight,
+      strengthLevel: d.strengthLevel,
+      bodyWeight: d.bodyWeight,
+      label: d.label,
+      workoutCount: d.workoutCount,
+      start: d.start,
+      end: d.end,
+    };
+  });
+
+  let lineWeeklyStrengthD = '';
+  let areaWeeklyStrengthD = '';
+  let lineWeeklyWeightD = '';
+
+  if (weeklyPoints.length > 1) {
+    lineWeeklyStrengthD = `M ${weeklyPoints.map((p) => `${p.x} ${p.yLeft}`).join(' L ')}`;
+    areaWeeklyStrengthD = `${lineWeeklyStrengthD} L ${weeklyPoints[weeklyPoints.length - 1].x} ${padding.top + chartHeight} L ${weeklyPoints[0].x} ${padding.top + chartHeight} Z`;
+
+    const validWeightPoints = weeklyPoints.filter((p) => p.yRight !== undefined);
+    if (validWeightPoints.length > 1) {
+      lineWeeklyWeightD = `M ${validWeightPoints.map((p) => `${p.x} ${p.yRight}`).join(' L ')}`;
+    }
+  }
+
+  const displayWeeklyPoint = activeWeeklyPointIdx !== null
+    ? weeklyPoints[activeWeeklyPointIdx]
+    : weeklyPoints[weeklyPoints.length - 1];
+
+  let leftWeeklyGridLines: { y: number; val: string }[] = [];
+  let rightWeeklyGridLines: { y: number; val: string }[] = [];
+  const gridCount = 4;
+
+  leftWeeklyGridLines = Array.from({ length: gridCount }).map((_, idx) => {
+    const val = minStrengthY + (idx / (gridCount - 1)) * (maxStrengthY - minStrengthY);
+    const y = padding.top + chartHeight - (idx / (gridCount - 1)) * chartHeight;
+    return { y, val: val.toFixed(0) };
+  });
+
+  if (hasWeeklyWeightData) {
+    rightWeeklyGridLines = Array.from({ length: gridCount }).map((_, idx) => {
+      const val = minWeeklyWeightY + (idx / (gridCount - 1)) * (maxWeeklyWeightY - minWeeklyWeightY);
+      const y = padding.top + chartHeight - (idx / (gridCount - 1)) * chartHeight;
+      return { y, val: val.toFixed(1) };
+    });
+  }
 
   let points: ChartPoint[] = [];
   let lineLeftD = '';
@@ -301,6 +580,268 @@ export function WorkoutStats() {
           Śledź swój progres siłowy i objętościowy skorelowany z wagą ciała.
         </p>
       </div>
+
+      {/* Heatmap & Weekly Correlation Section */}
+      <div className="card flex-column gap-12" style={{ padding: '16px' }}>
+        <div className="flex-row justify-between align-center">
+          <h3 style={{ fontSize: '15px', margin: 0 }}>Aktywność i Korelacja ({WEEKS_COUNT} tyg.)</h3>
+          <span style={{ fontSize: '12px', fontWeight: '600', color: 'var(--accent)' }}>
+            Ciąg treningowy: {weeklyStreakText}
+          </span>
+        </div>
+
+        {/* Heatmap daily grid */}
+        <div className="heatmap-scroll-container">
+          <div className="heatmap-grid">
+            {heatmapDays.map((day) => (
+              <div
+                key={day.dateKey}
+                className={`heatmap-cell ${day.active ? 'active' : ''}`}
+                title={`${day.date.toLocaleDateString('pl-PL')} ${day.active ? '(Trening zaliczony)' : '(Brak treningu)'}`}
+              />
+            ))}
+          </div>
+        </div>
+
+        <div style={{ borderBottom: '1px solid var(--border)', margin: '4px 0' }} />
+
+        {/* Weekly Correlation Chart */}
+        <h4 style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px', margin: '4px 0 0 0' }}>
+          Tonaż treningowy vs Waga ciała (Tygodniowo)
+        </h4>
+
+        {displayWeeklyPoint && (
+          <div
+            className="flex-row justify-between align-center"
+            style={{
+              padding: '8px 12px',
+              background: 'var(--bg-primary)',
+              borderRadius: '6px',
+              border: '1px solid var(--border)',
+              fontSize: '12.5px',
+            }}
+          >
+            <div className="flex-column" style={{ gap: '2px' }}>
+              <span className="text-muted" style={{ fontSize: '10px', textTransform: 'uppercase', fontWeight: 'bold' }}>
+                Tydzień od {displayWeeklyPoint.start.toLocaleDateString('pl-PL')} do {displayWeeklyPoint.end.toLocaleDateString('pl-PL')}
+              </span>
+              <span>
+                Treningi: <strong>{displayWeeklyPoint.workoutCount}</strong>
+              </span>
+            </div>
+            <div className="text-right" style={{ textAlign: 'right' }}>
+              <div style={{ color: 'var(--accent)', fontWeight: '600' }}>
+                Śr. tonaż: {displayWeeklyPoint.strengthLevel} kg
+              </div>
+              <div style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>
+                Waga: {displayWeeklyPoint.bodyWeight !== undefined && displayWeeklyPoint.bodyWeight !== null ? `${displayWeeklyPoint.bodyWeight} kg` : 'brak danych'}
+              </div>
+            </div>
+          </div>
+        )}
+
+        <div style={{ position: 'relative', width: '100%', overflow: 'hidden', marginTop: '4px' }}>
+          <svg
+            width="100%"
+            height="100%"
+            viewBox={`0 0 ${width} ${height}`}
+            style={{ overflow: 'visible', display: 'block' }}
+          >
+            <defs>
+              <linearGradient id="weekly-strength-gradient" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="var(--accent)" stopOpacity="0.25" />
+                <stop offset="100%" stopColor="var(--accent)" stopOpacity="0.0" />
+              </linearGradient>
+            </defs>
+
+            {/* Horizontal Gridlines */}
+            {leftWeeklyGridLines.map((line, idx) => (
+              <g key={idx}>
+                <line
+                  x1={padding.left}
+                  y1={line.y}
+                  x2={width - padding.right}
+                  y2={line.y}
+                  stroke="var(--border)"
+                  strokeWidth="1"
+                  strokeDasharray="4 4"
+                />
+                {/* Left Y Axis Labels (Strength Level) */}
+                <text
+                  x={padding.left - 10}
+                  y={line.y + 4}
+                  fill="var(--text-secondary)"
+                  fontSize="11"
+                  textAnchor="end"
+                  fontWeight="500"
+                >
+                  {line.val}
+                </text>
+              </g>
+            ))}
+
+            {/* Right Y Axis Labels (Body Weight) */}
+            {hasWeeklyWeightData && rightWeeklyGridLines.map((line, idx) => (
+              <text
+                key={idx}
+                x={width - padding.right + 10}
+                y={line.y + 4}
+                fill="var(--text-secondary)"
+                fontSize="11"
+                textAnchor="start"
+                fontWeight="500"
+              >
+                {line.val}
+              </text>
+            ))}
+
+            {/* Left vertical axis line */}
+            <line
+              x1={padding.left}
+              y1={padding.top}
+              x2={padding.left}
+              y2={padding.top + chartHeight}
+              stroke="var(--border)"
+              strokeWidth="1"
+            />
+
+            {/* Right vertical axis line */}
+            {hasWeeklyWeightData && (
+              <line
+                x1={width - padding.right}
+                y1={padding.top}
+                x2={width - padding.right}
+                y2={padding.top + chartHeight}
+                stroke="var(--border)"
+                strokeWidth="1"
+              />
+            )}
+
+            {/* Bottom horizontal axis line */}
+            <line
+              x1={padding.left}
+              y1={padding.top + chartHeight}
+              x2={width - padding.right}
+              y2={padding.top + chartHeight}
+              stroke="var(--border)"
+              strokeWidth="1"
+            />
+
+            {/* Draw Area for Strength Level */}
+            {weeklyPoints.length > 1 && (
+              <path d={areaWeeklyStrengthD} fill="url(#weekly-strength-gradient)" />
+            )}
+
+            {/* Draw Weight Line (Dashed) */}
+            {weeklyPoints.length > 1 && lineWeeklyWeightD && (
+              <path
+                d={lineWeeklyWeightD}
+                fill="none"
+                stroke="var(--text-secondary)"
+                strokeWidth="2"
+                strokeDasharray="4 4"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                opacity="0.5"
+              />
+            )}
+
+            {/* Draw Strength Level Line (Solid Blue) */}
+            {weeklyPoints.length > 1 && (
+              <path
+                d={lineWeeklyStrengthD}
+                fill="none"
+                stroke="var(--accent)"
+                strokeWidth="3.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            )}
+
+            {/* Circles for Data Points with Interaction */}
+            {weeklyPoints.map((p, idx) => {
+              const isActive = activeWeeklyPointIdx === idx || (activeWeeklyPointIdx === null && idx === 15);
+              return (
+                <g key={idx}>
+                  {/* Transparent larger circle for touch area */}
+                  <circle
+                    cx={p.x}
+                    cy={p.yLeft}
+                    r="14"
+                    fill="transparent"
+                    style={{ cursor: 'pointer' }}
+                    onClick={() => setActiveWeeklyPointIdx(idx)}
+                  />
+
+                  {/* Displayed circle marker on Strength Level Line */}
+                  <circle
+                    cx={p.x}
+                    cy={p.yLeft}
+                    r={isActive ? '6' : '4'}
+                    fill={isActive ? 'var(--accent)' : 'var(--bg-primary)'}
+                    stroke="var(--accent)"
+                    strokeWidth="2.5"
+                    style={{ transition: 'all 0.1s ease', cursor: 'pointer' }}
+                    onClick={() => setActiveWeeklyPointIdx(idx)}
+                  />
+
+                  {/* Date Axis Label (simplified for weeks, e.g. every 3 weeks to fit) */}
+                  {(() => {
+                    const shouldShow = idx % 3 === 0 || idx === 15;
+                    if (!shouldShow) return null;
+                    return (
+                      <text
+                        x={p.x}
+                        y={padding.top + chartHeight + 20}
+                        fill={isActive ? 'var(--accent)' : 'var(--text-secondary)'}
+                        fontSize="9"
+                        fontWeight={isActive ? '600' : 'normal'}
+                        textAnchor="middle"
+                      >
+                        {p.label}
+                      </text>
+                    );
+                  })()}
+                </g>
+              );
+            })}
+          </svg>
+        </div>
+
+        {/* Legend */}
+        <div className="flex-row justify-center gap-16" style={{ marginTop: '4px', fontSize: '11px', flexWrap: 'wrap' }}>
+          <div className="flex-row align-center gap-4">
+            <div style={{ width: '12px', height: '3px', background: 'var(--accent)', borderRadius: '1px' }} />
+            <span className="text-muted">Poziom siły (lewa oś Y)</span>
+          </div>
+          {hasWeeklyWeightData && (
+            <div className="flex-row align-center gap-4">
+              <div style={{ width: '12px', height: '1.5px', borderBottom: '1.5px dashed var(--text-secondary)', opacity: 0.6 }} />
+              <span className="text-muted">Waga ciała (prawa oś Y)</span>
+            </div>
+          )}
+        </div>
+
+        {/* Summary / Comparison message */}
+        {weeklyComparisonText && (
+          <div
+            style={{
+              marginTop: '8px',
+              padding: '10px 12px',
+              background: 'rgba(0, 210, 255, 0.02)',
+              borderLeft: '3px solid var(--accent)',
+              borderRadius: '0 6px 6px 0',
+              fontSize: '12.5px',
+              lineHeight: '1.5',
+              color: 'var(--text-secondary)',
+            }}
+          >
+            {weeklyComparisonText}
+          </div>
+        )}
+      </div>
+
+      <div style={{ borderBottom: '1px solid var(--border)', margin: '8px 0' }} />
 
       {/* Selector and filters */}
       <div className="card flex-column gap-12">
