@@ -25,7 +25,7 @@ export function Settings() {
   const [newWeightDate, setNewWeightDate] = useState<string>(getTodayDateStr());
   const [newWeightVal, setNewWeightVal] = useState<string>(() => {
     const logs = getWeightHistory();
-    return logs.length > 0 ? logs[logs.length - 1].weight.toString() : '80';
+    return logs.length > 0 ? logs[logs.length - 1].weight.toString() : '';
   });
 
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -36,20 +36,13 @@ export function Settings() {
     if (weightLogs.length > 0) {
       setNewWeightVal(weightLogs[weightLogs.length - 1].weight.toString());
     } else {
-      setNewWeightVal('80');
+      setNewWeightVal('');
     }
   }, [weightLogs]);
 
   const handleTimerDurationChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const duration = parseInt(e.target.value, 10) || 90;
     const updatedSettings = { ...settings, defaultTimerDuration: duration };
-    setSettings(updatedSettings);
-    saveSettings(updatedSettings);
-  };
-
-  const handleUserWeightChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const val = parseFloat(e.target.value);
-    const updatedSettings = { ...settings, userWeight: isNaN(val) ? undefined : val };
     setSettings(updatedSettings);
     saveSettings(updatedSettings);
   };
@@ -192,20 +185,6 @@ export function Settings() {
             <option value={120} style={{ backgroundColor: 'var(--bg-surface)' }}>2 minuty (120s)</option>
             <option value={180} style={{ backgroundColor: 'var(--bg-surface)' }}>3 minuty (180s)</option>
           </select>
-        </div>
-        <div className="form-group flex-column gap-4">
-          <label className="form-label" style={{ fontSize: '13px' }}>
-            Domyślna waga użytkownika (kg):
-          </label>
-          <input
-            type="number"
-            className="input-text"
-            value={settings.userWeight || ''}
-            onChange={handleUserWeightChange}
-            placeholder="np. 80"
-            step="0.1"
-            min="0"
-          />
         </div>
       </div>
 

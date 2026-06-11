@@ -5,7 +5,7 @@ import { RestTimer } from './RestTimer';
 
 interface WorkoutActiveProps {
   template: WorkoutTemplate;
-  userWeight: number;
+  userWeight?: number;
   onFinish: (logged: LoggedWorkout) => void;
   onCancel: () => void;
 }

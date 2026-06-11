@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { getExercises, getHistory, getSettings, getWeightHistory } from '../services/storage';
+import { getExercises, getHistory, getWeightHistory } from '../services/storage';
 import type { Exercise, LoggedWorkout, WeightLog } from '../types';
 
 type ChartViewType = 'maxWeight_maxReps' | 'sumReps_volume';
@@ -7,10 +7,10 @@ type ChartViewType = 'maxWeight_maxReps' | 'sumReps_volume';
 interface ChartPoint {
   x: number;
   yLeft: number;
-  yRight: number;
+  yRight?: number;
   yReps: number;
   leftVal: number;
-  rightVal: number;
+  rightVal?: number;
   repsVal: number;
   dateStr: string;
   fullDateStr: string;
@@ -19,10 +19,10 @@ interface ChartPoint {
   maxWeight: number;
   volume: number;
   estimated1RM: number;
-  bodyWeight: number;
+  bodyWeight?: number;
 }
 
-const getWorkoutBodyWeight = (workout: LoggedWorkout, weightLogs: WeightLog[], settingsUserWeight?: number): number => {
+const getWorkoutBodyWeight = (workout: LoggedWorkout, weightLogs: WeightLog[]): number | undefined => {
   if (workout.bodyWeight !== undefined && workout.bodyWeight !== null && workout.bodyWeight > 0) {
     return workout.bodyWeight;
   }
@@ -39,7 +39,7 @@ const getWorkoutBodyWeight = (workout: LoggedWorkout, weightLogs: WeightLog[], s
     }
     return closestLog.weight;
   }
-  return settingsUserWeight || 80;
+  return undefined;
 };
 
 export function WorkoutStats() {
@@ -52,7 +52,6 @@ export function WorkoutStats() {
   const [chartView, setChartView] = useState<ChartViewType>('maxWeight_maxReps');
   const [activePointIdx, setActivePointIdx] = useState<number | null>(null);
 
-  const settings = getSettings();
   const weightLogs = getWeightHistory();
   const selectedExercise = exercises.find((e) => e.id === selectedExerciseId);
 
@@ -63,7 +62,7 @@ export function WorkoutStats() {
     )
     .map((workout) => {
       const workoutEx = workout.exercises.find((ex) => ex.exerciseId === selectedExerciseId)!;
-      const bw = getWorkoutBodyWeight(workout, weightLogs, settings.userWeight);
+      const bw = getWorkoutBodyWeight(workout, weightLogs);
       
       const completedSets = workoutEx.sets.filter((s) => s.completed);
       const targetSets = completedSets.length > 0 ? completedSets : workoutEx.sets;
@@ -111,6 +110,7 @@ export function WorkoutStats() {
   let areaLeftD = '';
   let lineRightD = '';
   let lineRepsD = '';
+  let hasWeightData = false;
   
   let leftGridLines: { y: number; val: string }[] = [];
   let rightGridLines: { y: number; val: string }[] = [];
@@ -138,20 +138,24 @@ export function WorkoutStats() {
     minLeft = Math.floor(minLeft);
     maxLeft = Math.ceil(maxLeft);
 
-    // Right axis metric: Body Weight
-    const rightValues = exerciseSessions.map((d) => d.bodyWeight);
-    minRight = Math.min(...rightValues);
-    maxRight = Math.max(...rightValues);
-    if (minRight === maxRight) {
-      minRight = Math.max(0, minRight - 5);
-      maxRight = maxRight + 5;
-    } else {
-      const range = maxRight - minRight;
-      minRight = Math.max(0, minRight - range * 0.15);
-      maxRight = maxRight + range * 0.15;
+    // Right Y Axis metric: Body Weight
+    const rightValues = exerciseSessions.map((d) => d.bodyWeight).filter((w): w is number => w !== undefined && w !== null && w > 0);
+    hasWeightData = rightValues.length > 0;
+
+    if (hasWeightData) {
+      minRight = Math.min(...rightValues);
+      maxRight = Math.max(...rightValues);
+      if (minRight === maxRight) {
+        minRight = Math.max(0, minRight - 5);
+        maxRight = maxRight + 5;
+      } else {
+        const range = maxRight - minRight;
+        minRight = Math.max(0, minRight - range * 0.15);
+        maxRight = maxRight + range * 0.15;
+      }
+      minRight = Math.floor(minRight);
+      maxRight = Math.ceil(maxRight);
     }
-    minRight = Math.floor(minRight);
-    maxRight = Math.ceil(maxRight);
 
     // Reps metric: Max Reps or Sum of Reps
     const repsValues = exerciseSessions.map((d) => chartView === 'maxWeight_maxReps' ? d.maxReps : d.sumReps);
@@ -176,7 +180,9 @@ export function WorkoutStats() {
       const repsVal = chartView === 'maxWeight_maxReps' ? d.maxReps : d.sumReps;
 
       const yLeft = padding.top + chartHeight - ((leftVal - minLeft) / (maxLeft - minLeft)) * chartHeight;
-      const yRight = padding.top + chartHeight - ((rightVal - minRight) / (maxRight - minRight)) * chartHeight;
+      const yRight = (hasWeightData && rightVal !== undefined && rightVal !== null && minRight !== maxRight)
+        ? padding.top + chartHeight - ((rightVal - minRight) / (maxRight - minRight)) * chartHeight
+        : undefined;
       const yReps = padding.top + chartHeight - ((repsVal - minReps) / (maxReps - minReps)) * chartHeight;
 
       return {
@@ -201,7 +207,12 @@ export function WorkoutStats() {
     if (points.length > 1) {
       lineLeftD = `M ${points.map((p) => `${p.x} ${p.yLeft}`).join(' L ')}`;
       areaLeftD = `${lineLeftD} L ${points[points.length - 1].x} ${padding.top + chartHeight} L ${points[0].x} ${padding.top + chartHeight} Z`;
-      lineRightD = `M ${points.map((p) => `${p.x} ${p.yRight}`).join(' L ')}`;
+      
+      const validWeightPoints = points.filter((p) => p.yRight !== undefined);
+      if (validWeightPoints.length > 1) {
+        lineRightD = `M ${validWeightPoints.map((p) => `${p.x} ${p.yRight}`).join(' L ')}`;
+      }
+      
       lineRepsD = `M ${points.map((p) => `${p.x} ${p.yReps}`).join(' L ')}`;
     }
 
@@ -213,11 +224,13 @@ export function WorkoutStats() {
       return { y, val: val.toFixed(0) };
     });
 
-    rightGridLines = Array.from({ length: gridCount }).map((_, idx) => {
-      const val = minRight + (idx / (gridCount - 1)) * (maxRight - minRight);
-      const y = padding.top + chartHeight - (idx / (gridCount - 1)) * chartHeight;
-      return { y, val: val.toFixed(1) };
-    });
+    if (hasWeightData) {
+      rightGridLines = Array.from({ length: gridCount }).map((_, idx) => {
+        const val = minRight + (idx / (gridCount - 1)) * (maxRight - minRight);
+        const y = padding.top + chartHeight - (idx / (gridCount - 1)) * chartHeight;
+        return { y, val: val.toFixed(1) };
+      });
+    }
   }
 
   // Active point info display (defaults to the latest one)
@@ -240,39 +253,42 @@ export function WorkoutStats() {
   if (exerciseSessions.length >= 2) {
     const earliest = exerciseSessions[0];
     const latest = exerciseSessions[exerciseSessions.length - 1];
-    const deltaWeight = latest.bodyWeight - earliest.bodyWeight;
+    
+    if (earliest.bodyWeight !== undefined && earliest.bodyWeight !== null && latest.bodyWeight !== undefined && latest.bodyWeight !== null) {
+      const deltaWeight = latest.bodyWeight - earliest.bodyWeight;
 
-    if (chartView === 'maxWeight_maxReps') {
-      const deltaMaxWeight = latest.maxWeight - earliest.maxWeight;
-      const deltaMaxReps = latest.maxReps - earliest.maxReps;
+      if (chartView === 'maxWeight_maxReps') {
+        const deltaMaxWeight = latest.maxWeight - earliest.maxWeight;
+        const deltaMaxReps = latest.maxReps - earliest.maxReps;
 
-      const weightSign = deltaMaxWeight >= 0 ? '+' : '';
-      const repsSign = deltaMaxReps >= 0 ? '+' : '';
+        const weightSign = deltaMaxWeight >= 0 ? '+' : '';
+        const repsSign = deltaMaxReps >= 0 ? '+' : '';
 
-      const performanceText = `maksymalny ciężar zmienił się o ${weightSign}${deltaMaxWeight.toFixed(1)} kg, a maks. powtórzenia o ${repsSign}${deltaMaxReps} powt.`;
+        const performanceText = `maksymalny ciężar zmienił się o ${weightSign}${deltaMaxWeight.toFixed(1)} kg, a maks. powtórzenia o ${repsSign}${deltaMaxReps} powt.`;
 
-      if (deltaWeight < 0) {
-        motivationalDescription = `Twoja waga spadła o ${Math.abs(deltaWeight).toFixed(1)} kg. W tym czasie Twój ${performanceText}. Spadek masy ciała często poprawia siłę względną i ułatwia ruchy z obciążeniem.`;
-      } else if (deltaWeight > 0) {
-        motivationalDescription = `Twoja waga wzrosła o ${deltaWeight.toFixed(1)} kg. W tym czasie Twój ${performanceText}. Przyrost masy ciała może wspierać budowanie siły absolutnej, ale stawia też większe wyzwania przed kontrolą ciała.`;
+        if (deltaWeight < 0) {
+          motivationalDescription = `Twoja waga spadła o ${Math.abs(deltaWeight).toFixed(1)} kg. W tym czasie Twój ${performanceText}. Spadek masy ciała często poprawia siłę względną i ułatwia ruchy z obciążeniem.`;
+        } else if (deltaWeight > 0) {
+          motivationalDescription = `Twoja waga wzrosła o ${deltaWeight.toFixed(1)} kg. W tym czasie Twój ${performanceText}. Przyrost masy ciała może wspierać budowanie siły absolutnej, ale stawia też większe wyzwania przed kontrolą ciała.`;
+        } else {
+          motivationalDescription = `Twoja waga pozostała bez zmian. W tym czasie Twój ${performanceText}. Stabilizacja wagi sprzyja precyzyjnej ocenie czystego progresu siłowego.`;
+        }
       } else {
-        motivationalDescription = `Twoja waga pozostała bez zmian. W tym czasie Twój ${performanceText}. Stabilizacja wagi sprzyja precyzyjnej ocenie czystego progresu siłowego.`;
-      }
-    } else {
-      const deltaVolume = latest.volume - earliest.volume;
-      const deltaSumReps = latest.sumReps - earliest.sumReps;
+        const deltaVolume = latest.volume - earliest.volume;
+        const deltaSumReps = latest.sumReps - earliest.sumReps;
 
-      const volSign = deltaVolume >= 0 ? '+' : '';
-      const repsSign = deltaSumReps >= 0 ? '+' : '';
+        const volSign = deltaVolume >= 0 ? '+' : '';
+        const repsSign = deltaSumReps >= 0 ? '+' : '';
 
-      const performanceText = `objętość treningowa zmieniła się o ${volSign}${deltaVolume.toFixed(1)} kg, a suma powtórzeń o ${repsSign}${deltaSumReps} powt.`;
+        const performanceText = `objętość treningowa zmieniła się o ${volSign}${deltaVolume.toFixed(1)} kg, a suma powtórzeń o ${repsSign}${deltaSumReps} powt.`;
 
-      if (deltaWeight < 0) {
-        motivationalDescription = `Twoja waga spadła o ${Math.abs(deltaWeight).toFixed(1)} kg. W tym czasie Twoja ${performanceText}. Gratulacje za utrzymanie lub poprawę objętości pracy przy niższej masie ciała!`;
-      } else if (deltaWeight > 0) {
-        motivationalDescription = `Twoja waga wzrosła o ${deltaWeight.toFixed(1)} kg. W tym czasie Twoja ${performanceText}. Dodatkowa masa ciała pomaga w generowaniu wyższej objętości treningowej, o ile idzie w parze z odpowiednią regeneracją.`;
-      } else {
-        motivationalDescription = `Twoja waga pozostała bez zmian. W tym czasie Twoja ${performanceText}. Świetny punkt odniesienia do analizy wydolności mięśniowej.`;
+        if (deltaWeight < 0) {
+          motivationalDescription = `Twoja waga spadła o ${Math.abs(deltaWeight).toFixed(1)} kg. W tym czasie Twoja ${performanceText}. Gratulacje za utrzymanie lub poprawę objętości pracy przy niższej masie ciała!`;
+        } else if (deltaWeight > 0) {
+          motivationalDescription = `Twoja waga wzrosła o ${deltaWeight.toFixed(1)} kg. W tym czasie Twoja ${performanceText}. Dodatkowa masa ciała pomaga w generowaniu wyższej objętości treningowej, o ile idzie w parze z odpowiednią regeneracją.`;
+        } else {
+          motivationalDescription = `Twoja waga pozostała bez zmian. W tym czasie Twoja ${performanceText}. Świetny punkt odniesienia do analizy wydolności mięśniowej.`;
+        }
       }
     }
   }
@@ -377,7 +393,7 @@ export function WorkoutStats() {
                   Sesja z {displayPoint.fullDateStr}
                 </span>
                 <span style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
-                  Waga ciała w tej sesji: <strong style={{ color: 'var(--text-primary)' }}>{displayPoint.bodyWeight.toFixed(1)} kg</strong>
+                  Waga ciała w tej sesji: <strong style={{ color: 'var(--text-primary)' }}>{displayPoint.bodyWeight !== undefined && displayPoint.bodyWeight !== null ? `${displayPoint.bodyWeight.toFixed(1)} kg` : 'brak danych'}</strong>
                 </span>
               </div>
               <div className="text-center">
@@ -447,7 +463,7 @@ export function WorkoutStats() {
                 ))}
 
                 {/* Right Y Axis Labels (Body Weight) */}
-                {rightGridLines.map((line, idx) => (
+                {hasWeightData && rightGridLines.map((line, idx) => (
                   <text
                     key={idx}
                     x={width - padding.right + 10}
@@ -472,14 +488,16 @@ export function WorkoutStats() {
                 />
 
                 {/* Right vertical axis line */}
-                <line
-                  x1={width - padding.right}
-                  y1={padding.top}
-                  x2={width - padding.right}
-                  y2={padding.top + chartHeight}
-                  stroke="var(--border)"
-                  strokeWidth="1"
-                />
+                {hasWeightData && (
+                  <line
+                    x1={width - padding.right}
+                    y1={padding.top}
+                    x2={width - padding.right}
+                    y2={padding.top + chartHeight}
+                    stroke="var(--border)"
+                    strokeWidth="1"
+                  />
+                )}
 
                 {/* Bottom horizontal axis line */}
                 <line
@@ -624,10 +642,12 @@ export function WorkoutStats() {
                   {chartView === 'maxWeight_maxReps' ? 'Maks. Powtórzenia' : 'Suma Powtórzeń'} (trend)
                 </span>
               </div>
-              <div className="flex-row align-center gap-4">
-                <div style={{ width: '12px', height: '1.5px', borderBottom: '1.5px dashed var(--text-secondary)', opacity: 0.6 }} />
-                <span className="text-muted">Waga ciała (prawa oś Y)</span>
-              </div>
+              {hasWeightData && (
+                <div className="flex-row align-center gap-4">
+                  <div style={{ width: '12px', height: '1.5px', borderBottom: '1.5px dashed var(--text-secondary)', opacity: 0.6 }} />
+                  <span className="text-muted">Waga ciała (prawa oś Y)</span>
+                </div>
+              )}
             </div>
           </div>
 

@@ -60,7 +60,6 @@ export const deleteExercise = (id: string): Exercise[] => {
 
 const DEFAULT_SETTINGS: AppSettings = {
   defaultTimerDuration: 90,
-  userWeight: 80,
   scheduleType: 'weekly',
   rotationTemplates: [],
   weeklyWorkoutTarget: 3,
