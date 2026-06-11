@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import type { WorkoutTemplate, LoggedWorkout, WorkoutExercise, WorkoutSet, Exercise } from '../types';
-import { getExercises, saveWorkout, getSettings } from '../services/storage';
+import { getExercises, saveWorkout, getSettings, saveTemplate } from '../services/storage';
 import { RestTimer } from './RestTimer';
 
 interface WorkoutActiveProps {
@@ -128,6 +128,30 @@ export function WorkoutActive({ template, userWeight, onFinish, onCancel }: Work
     setSearchQuery('');
   };
 
+  const hasTemplateChanges = () => {
+    if (exercises.length !== template.exercises.length) {
+      return true;
+    }
+    for (let i = 0; i < exercises.length; i++) {
+      const activeEx = exercises[i];
+      const templateEx = template.exercises[i];
+      if (activeEx.exerciseId !== templateEx?.exerciseId) {
+        return true;
+      }
+      if (activeEx.sets.length !== templateEx.sets.length) {
+        return true;
+      }
+      for (let j = 0; j < activeEx.sets.length; j++) {
+        const activeSet = activeEx.sets[j];
+        const templateSet = templateEx.sets[j];
+        if (activeSet.reps !== templateSet.reps || activeSet.weight !== templateSet.weight) {
+          return true;
+        }
+      }
+    }
+    return false;
+  };
+
   const handleFinishWorkout = () => {
     const totalCompletedSets = exercises.reduce(
       (sum, ex) => sum + ex.sets.filter((s) => s.completed).length,
@@ -153,6 +177,30 @@ export function WorkoutActive({ template, userWeight, onFinish, onCancel }: Work
       exercises: exercises.filter((ex) => ex.sets.length > 0),
       bodyWeight: userWeight,
     };
+
+    // Check if there are changes to reps or weight compared to the template
+    if (hasTemplateChanges()) {
+      const confirmUpdate = window.confirm(
+        'Wartości serii (ilość powtórzeń lub ciężar) różnią się od zdefiniowanych w szablonie. Czy chcesz zaktualizować szablon o nowe wartości?'
+      );
+      if (confirmUpdate) {
+        const updatedExercises = exercises.map((ex) => ({
+          ...ex,
+          sets: ex.sets.map((set) => ({
+            reps: set.reps,
+            weight: set.weight,
+            completed: false,
+          })),
+        }));
+
+        const updatedTemplate: WorkoutTemplate = {
+          ...template,
+          exercises: updatedExercises,
+        };
+
+        saveTemplate(updatedTemplate);
+      }
+    }
 
     // Save directly to storage
     saveWorkout(loggedWorkout);
@@ -283,6 +331,22 @@ export function WorkoutActive({ template, userWeight, onFinish, onCancel }: Work
                       <span className="set-number">{setIdx + 1}</span>
                       
                       <div className="set-input-group">
+                        <button
+                          type="button"
+                          className="btn-set-adjust"
+                          onClick={() =>
+                            handleSetChange(
+                              exIdx,
+                              setIdx,
+                              'reps',
+                              Math.max(0, (set.reps || 0) - 1)
+                            )
+                          }
+                          disabled={set.completed}
+                          title="Odejmij powtórzenie"
+                        >
+                          &minus;
+                        </button>
                         <input
                           type="number"
                           className="set-input"
@@ -299,6 +363,22 @@ export function WorkoutActive({ template, userWeight, onFinish, onCancel }: Work
                           min="0"
                         />
                         <span className="set-label">powt.</span>
+                        <button
+                          type="button"
+                          className="btn-set-adjust"
+                          onClick={() =>
+                            handleSetChange(
+                              exIdx,
+                              setIdx,
+                              'reps',
+                              (set.reps || 0) + 1
+                            )
+                          }
+                          disabled={set.completed}
+                          title="Dodaj powtórzenie"
+                        >
+                          &#43;
+                        </button>
                       </div>
 
                       <div className="set-input-group">
